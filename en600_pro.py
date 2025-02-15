@@ -18,27 +18,212 @@ from gtts import gTTS
 from pydub import AudioSegment
 import io
 
-## streamlit run en600st/en600_st_app.py
+## streamlit run en600st/en600_st_pro.py
 
 # 기본 경로 설정
 SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 SETTINGS_PATH = SCRIPT_DIR / 'base/en600s-settings.json'
 EXCEL_PATH = SCRIPT_DIR / 'base/en600new.xlsx'
-TEMP_DIR = SCRIPT_DIR / 'temp'  # 임시 파일 저장 경로 추가
+TEMP_DIR = SCRIPT_DIR / 'temp'
 
-# base 폴더가 없으면 생성
-base_dir = SCRIPT_DIR / 'base'
-if not base_dir.exists():
-    try:
-        base_dir.mkdir(parents=True, exist_ok=True)
-        st.info("base 디렉토리가 생성되었습니다. 엑셀 파일을 해당 디렉토리에 넣어주세요.")
-    except Exception as e:
-        st.error(f"base 디렉토리 생성 중 오류 발생: {e}")
+# 필요한 디렉토리 생성
+for dir_path in [SCRIPT_DIR / 'base', TEMP_DIR]:
+    if not dir_path.exists():
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+# 설정 파일이 없는 경우 기본 설정 생성
+if not SETTINGS_PATH.exists():
+    default_settings = {
+        'first_lang': 'korean',
+        'second_lang': 'english',
+        'third_lang': 'chinese',
+        'first_repeat': 0,
+        'second_repeat': 1,
+        'third_repeat': 1,  
+        'eng_voice': 'Jenny (US)',  # 국적 표시 추가
+        'kor_voice': '선희',
+        'zh_voice': '샤오샤오 (여)',  # 기본값을 샤오샤오로 설정
+        'jp_voice': 'Nanami',
+        'vi_voice': 'HoaiMy',
+        'start_row': 1,
+        'end_row': 50,
+        'selected_sheet': 'en600 : 생활회화 600문장',  # 기본 시트 설정 수정
+        'word_delay': 1,
+        'spacing': 1.0,          # 기본값 1.0으로 명시
+        'subtitle_delay': 1.0,   # 기본값 1.0으로 명시
+        'next_sentence_time': 1.0,  # 기본값 1.0으로 명시
+        'english_speed': 1.2,
+        'korean_speed': 1.2,
+        'chinese_speed': 1.2,
+        'japanese_speed': 1.2,
+        'vietnamese_speed': 1.2,
+        'keep_subtitles': True,
+        'break_enabled': True,
+        'break_interval': 10,
+        'break_duration': 10,
+        'auto_repeat': True,
+        'repeat_count': 3,  # 기본값 3으로 변경
+        'english_font': 'Pretendard',
+        'korean_font': 'Pretendard',
+        'chinese_font': 'SimSun',
+        'english_font_size': 32,
+        'korean_font_size': 25,
+        'chinese_font_size': 32,
+        'japanese_font': 'PretendardJP-Light',
+        'japanese_font_size': 28,
+        'hide_subtitles': {
+            'first_lang': False,
+            'second_lang': False,
+            'third_lang': False,
+        },
+        'english_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
+        'korean_color': '#00FF00',   # 다크모드: 초록색, 브라이트모드: 검정색
+        'chinese_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
+        'japanese_color': '#00FF00',  # 다크모드: 초록색, 라이트모드: 흰색
+        'vietnamese_color': '#00FF00',  # 다크모드: 초록색, 라이트모드: 흰색
+        'japanese_speed': 2.0,  # 일본어 배속 기본값 추가
+        'vietnamese_font': 'Arial',  # 베트남어 폰트 기본값 추가
+        'vietnamese_font_size': 30,
+        'vietnamese_speed': 1.2,
+        'healing_music': False,
+        'healing_duration': 60,  # 힐링뮤직 기본 재생 시간 1분으로 변경
+        'voice_notification': True,
+        'notification_voice': '선희',  # 기본 알림 음성
+    }
+    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(default_settings, f, ensure_ascii=False, indent=2)
 
 # 엑셀 파일 존재 여부 확인
+def create_default_excel():
+    """기본 엑셀 파일 생성"""
+    try:
+        # 기본 데이터 생성 - 빈 데이터로 시작
+        data = {
+            'Sheet1': [
+                ['English', 'Korean', 'Chinese', 'Vietnamese', 'Japanese']
+            ]
+        }
+        
+        # 엑셀 파일 생성
+        with pd.ExcelWriter(EXCEL_PATH, engine='openpyxl') as writer:
+            for sheet_name, sheet_data in data.items():
+                df = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+                df.to_excel(writer, sheet_name=sheet_name, index=False, header=True)
+        
+        st.success("기본 엑셀 파일이 생성되었습니다.")
+        return True
+    except Exception as e:
+        st.error(f"기본 엑셀 파일 생성 중 오류 발생: {e}")
+        return False
+
+# 엑셀 파일 존재 여부 확인 및 생성
 if not EXCEL_PATH.exists():
-    st.error(f"엑셀 파일이 존재하지 않습니다: {EXCEL_PATH}")
-    st.info("엑셀 파일을 base 디렉토리에 넣어주세요.")
+    st.warning(f"엑셀 파일을 찾을 수 없습니다: {EXCEL_PATH}")
+    st.info("기본 엑셀 파일을 생성합니다...")
+    if create_default_excel():
+        st.success("기본 엑셀 파일이 생성되었습니다. 이제 학습을 시작할 수 있습니다.")
+    else:
+        st.error("기본 엑셀 파일 생성에 실패했습니다. base 폴더에 en600new.xlsx 파일을 직접 넣어주세요.")
+
+# 엑셀 파일에서 시트 목록 가져오기
+def get_excel_sheets():
+    """엑셀 파일에서 시트 목록 가져오기"""
+    try:
+        xl = pd.ExcelFile(EXCEL_PATH)
+        sheet_names = xl.sheet_names
+        
+        # 시트 이름 매핑
+        sheet_display_names = {
+            'Sheet1': 'en600 : 생활회화 600문장',
+            'Sheet2': 'travel : 여행영어 810문장'
+        }
+        
+        # 각 시트의 실제 데이터 행 수 확인
+        sheet_info = {}
+        for sheet in sheet_names:
+            df = pd.read_excel(
+                EXCEL_PATH,
+                sheet_name=sheet,
+                header=None,
+                engine='openpyxl'
+            )
+            # 실제 데이터가 있는 마지막 행 찾기
+            last_row = 0
+            for i in range(len(df)):
+                if df.iloc[i, 0].strip() == '' and df.iloc[i, 1].strip() == '' and df.iloc[i, 2].strip() == '':
+                    break
+                last_row = i + 1
+            
+            if last_row > 0:  # 데이터가 있는 시트만 포함
+                # 매핑된 이름이 있으면 사용, 없으면 원래 이름 사용
+                display_name = sheet_display_names.get(sheet, sheet)
+                sheet_info[display_name] = last_row
+        
+        # 수정: 표시 이름으로 된 시트명 목록 반환
+        return list(sheet_info.keys())
+            
+    except Exception as e:
+        st.error(f"엑셀 시트 목록 가져오기 오류: {e}")
+        return ['en600 : 생활회화 600문장']
+
+def get_sheet_name_from_display(display_name):
+    """표시용 시트명에서 실제 시트명 추출"""
+    # 시트 이름 역매핑
+    sheet_name_mapping = {
+        'en600 : 생활회화 600문장': 'Sheet1',
+        'travel : 여행영어 810문장': 'Sheet2'
+    }
+    
+    # 매핑된 실제 시트명이 있으면 반환, 없으면 원래 이름 사용
+    return sheet_name_mapping.get(display_name, display_name)
+
+# 엑셀 파일 읽기 함수
+def read_excel_data(sheet_name='Sheet1'):
+    """엑셀 파일 읽기 함수"""
+    try:
+        # 표시용 시트명에서 실제 시트명 추출
+        actual_sheet_name = get_sheet_name_from_display(sheet_name)
+        
+        df = pd.read_excel(
+            EXCEL_PATH,
+            header=None,
+            engine='openpyxl',
+            sheet_name=actual_sheet_name
+        )
+        # 데이터 프레임이 비어있는지 확인
+        if df.empty:
+            st.error(f"선택한 시트 '{actual_sheet_name}'가 비어있습니다.")
+            return None, 0
+            
+        # 최소 3개의 열(영어, 한국어, 중국어)이 있는지 확인
+        if len(df.columns) < 3:
+            st.error(f"선택한 시트 '{actual_sheet_name}'의 형식이 올바르지 않습니다. 최소 3개의 열(영어, 한국어, 중국어)이 필요합니다.")
+            return None, 0
+            
+        # NaN 값을 빈 문자열로 대체
+        df = df.fillna('')
+        
+        # 베트남어와 일본어 열이 없는 경우 빈 열 추가
+        if len(df.columns) < 4:
+            df[3] = ''  # 베트남어 열 추가
+        if len(df.columns) < 5:
+            df[4] = ''  # 일본어 열 추가
+        
+        # 실제 데이터가 있는 마지막 행 찾기
+        last_row = 0
+        for i in range(len(df)):
+            if df.iloc[i, 0].strip() == '' and df.iloc[i, 1].strip() == '' and df.iloc[i, 2].strip() == '':
+                break
+            last_row = i + 1
+        
+        return df, last_row
+    except Exception as e:
+        st.error(f"엑셀 파일 읽기 오류: {e}")
+        return None, 0
+
+# base 폴더가 없으면 생성
+if not (SCRIPT_DIR / 'base').exists():
+    (SCRIPT_DIR / 'base').mkdir(parents=True)
 
 # 언어 표시 매핑 수정
 LANG_DISPLAY = {
@@ -52,25 +237,33 @@ LANG_DISPLAY = {
 # 음성 매핑에 남성 음성 추가
 VOICE_MAPPING = {
     'english': {
-        "Steffan": "en-US-SteffanNeural",
-        "Roger": "en-US-RogerNeural",
-        "Sonia": "en-GB-SoniaNeural",
-        "Brian": "en-US-BrianNeural",
-        "Emma": "en-US-EmmaNeural",
-        "Jenny": "en-US-JennyNeural",
-        "Guy": "en-US-GuyNeural",
-        "Aria": "en-US-AriaNeural",
-        "Ryan": "en-GB-RyanNeural"
+        "Jenny (US)": "en-US-JennyNeural",
+        "Emma (US)": "en-US-EmmaNeural",
+        "Aria (US)": "en-US-AriaNeural",
+        "Sonia (UK)": "en-GB-SoniaNeural",
+        "Guy (US)": "en-US-GuyNeural",
+        "Roger (US)": "en-US-RogerNeural",
+        "Brian (US)": "en-US-BrianNeural",
+        "Steffan (US)": "en-US-SteffanNeural",
+        "Ryan (UK)": "en-GB-RyanNeural",
+        "Natasha (AU)": "en-AU-NatashaNeural",
+        "William (AU)": "en-AU-WilliamNeural",
+        "Molly (NZ)": "en-NZ-MollyNeural",
+        "Mitchell (NZ)": "en-NZ-MitchellNeural",
+        "Luna (SG)": "en-SG-LunaNeural",
+        "Wayne (SG)": "en-SG-WayneNeural"
     },
     'korean': {
         "선희": "ko-KR-SunHiNeural",
         "인준": "ko-KR-InJoonNeural"
     },
     'chinese': {
-        "샤오샤오": "zh-CN-XiaoxiaoNeural",
-        "윈시": "zh-CN-YunxiNeural",
-        "Yunjian": "zh-CN-YunjianNeural",
-        "Yunyang": "zh-CN-YunyangNeural"
+        "샤오샤오 (여)": "zh-CN-XiaoXiaoNeural",      # 중국 여성
+        "샤오이 (여)": "zh-CN-XiaoYiNeural",          # 중국 여성
+        "샤오한 (여)": "zh-CN-XiaoHanNeural",         # 중국 여성
+        # 남성 음성
+        "윈지엔 (남)": "zh-CN-YunjianNeural",        # 중국 남성
+        "윈양 (남)": "zh-CN-YunyangNeural"           # 중국 남성
     },
     'japanese': {
         "Nanami": "ja-JP-NanamiNeural",
@@ -103,70 +296,9 @@ def initialize_session_state():
         st.session_state.clear()
         st.session_state.initialized = True
         st.session_state.page = 'settings'
-        
-    # 기본 설정값 정의
-    default_settings = {
-        'first_lang': 'korean',
-        'second_lang': 'english',
-        'third_lang': 'chinese',
-        'first_repeat': 0,
-        'second_repeat': 1,
-        'third_repeat': 1,  
-        'eng_voice': 'Jenny',
-        'kor_voice': '선희',
-        'zh_voice': 'Yunjian',
-        'jp_voice': 'Nanami',
-        'vi_voice': 'HoaiMy',
-        'start_row': 1,
-        'end_row': 50,
-        'word_delay': 1,
-        'spacing': 1.0,          # 기본값 1.0으로 명시
-        'subtitle_delay': 1.0,   # 기본값 1.0으로 명시
-        'next_sentence_time': 1.0,  # 기본값 1.0으로 명시
-        'english_speed': 1.2,
-        'korean_speed': 1.2,
-        'chinese_speed': 1.2,
-        'japanese_speed': 1.2,
-        'vietnamese_speed': 1.2,
-        'keep_subtitles': True,
-        'break_enabled': True,
-        'break_interval': 10,
-        'break_duration': 10,
-        'auto_repeat': True,
-        'repeat_count': 5,  # 기본 반복 횟수 추가
-        'english_font': 'Pretendard',
-        'korean_font': 'Pretendard',
-        'chinese_font': 'SimSun',
-        'english_font_size': 32,
-        'korean_font_size': 32,
-        'chinese_font_size': 30,
-        'japanese_font': 'PretendardJP-Light',
-        'japanese_font_size': 30,
-        'hide_subtitles': {
-            'first_lang': False,
-            'second_lang': False,
-            'third_lang': False,
-        },
-        'english_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
-        'korean_color': '#00FF00',   # 다크모드: 초록색, 브라이트모드: 검정색
-        'chinese_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
-        'japanese_color': '#00FF00' if st.get_option("theme.base") == "dark" else '#FFFFFF',  # 다크모드: 초록색, 라이트모드: 흰색
-        'vietnamese_color': '#00FF00' if st.get_option("theme.base") == "dark" else '#FFFFFF',  # 다크모드: 초록색, 라이트모드: 흰색
-        'japanese_speed': 2.0,  # 일본어 배속 기본값 추가
-        'vietnamese_font': 'Arial',  # 베트남어 폰트 기본값 추가
-        'vietnamese_font_size': 30,
-        'vietnamese_speed': 1.0,
-        'selected_sheet': 'Sheet1',  # 기본 시트 이름 추가
-    }
-    
-    # 설정이 없는 경우 기본값으로 초기화
-    if 'settings' not in st.session_state:
-        st.session_state.settings = default_settings
-    else:
-        # 기존 설정에 누락된 값이 있으면 기본값으로 보완
-        for key, value in default_settings.items():
-            if key not in st.session_state.settings:
-                st.session_state.settings[key] = value
+        st.session_state.settings_backup = None  # 설정 백업용 변수 추가
+    if 'user_language' not in st.session_state:
+        st.session_state.user_language = 'korean'  # 기본값 설정
 
     # 학습 시간 관련 변수 초기화
     if 'start_time' not in st.session_state:
@@ -202,6 +334,132 @@ def initialize_session_state():
     if not TEMP_DIR.exists():
         TEMP_DIR.mkdir(parents=True)
     
+    if 'settings' not in st.session_state:
+        # 설정 파일이 있으면서 필수 키가 모두 있는지 확인
+        required_keys = {'jp_voice', 'vi_voice', 'japanese_speed', 'vietnamese_speed'}
+        
+        # 설정 마이그레이션 함수 수정
+        def migrate_voice_settings(settings):
+            # 중국어 음성 마이그레이션
+            voice_migrations = {
+                # 이전 버전 음성들을 새로운 형식으로 변환
+                'XiaoXiao (CN)': '샤오샤오 (여)',
+                'XiaoYi (CN)': '샤오이 (여)',
+                'YunJian (CN)': '윈지엔 (남)',
+                'YunYang (CN)': '윈양 (남)',
+                'YunXi (CN)': '윈시 (남)',
+                # 기존 한글 이름도 처리
+                '샤오샤오': '샤오샤오 (여)',
+                '윈시': '윈시 (남)',
+                '윈지엔': '윈지엔 (남)',
+                '윈양': '윈양 (남)'
+            }
+            
+            if 'zh_voice' in settings:
+                old_voice = settings['zh_voice']
+                if old_voice in voice_migrations:
+                    settings['zh_voice'] = voice_migrations[old_voice]
+                elif old_voice not in VOICE_MAPPING['chinese']:
+                    settings['zh_voice'] = '샤오샤오 (여)'  # 기본값을 샤오샤오로 설정
+            
+            return settings
+
+        try:
+            if SETTINGS_PATH.exists():
+                with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
+                    saved_settings = json.load(f)
+                    # 설정 마이그레이션 수행
+                    saved_settings = migrate_voice_settings(saved_settings)
+                    
+                    # 필수 키가 모두 있는지 확인
+                    if all(key in saved_settings for key in required_keys):
+                        # 테마에 따라 색상 업데이트
+                        if is_dark_mode:
+                            saved_settings.update({
+                                'english_color': '#00FF00',
+                                'korean_color': '#00FF00',
+                                'chinese_color': '#00FF00',
+                                'japanese_color': '#00FF00',
+                                'vietnamese_color': '#00FF00',
+                            })
+                        else:
+                            saved_settings.update({
+                                'english_color': '#000000',
+                                'korean_color': '#000000',
+                                'chinese_color': '#000000',
+                                'japanese_color': '#FFFFFF',
+                                'vietnamese_color': '#FFFFFF',
+                            })
+                        st.session_state.settings = saved_settings
+                        return
+                    else:
+                        # 필수 키가 없으면 설정 파일 삭제
+                        os.remove(SETTINGS_PATH)
+        except Exception as e:
+            st.error(f"설정 파일 로드 중 오류: {e}")
+            # 오류 발생 시 설정 파일 삭제
+            if SETTINGS_PATH.exists():
+                os.remove(SETTINGS_PATH)
+        
+        # 저장된 설정이 없거나 유효하지 않으면 기본값 사용
+        st.session_state.settings = {
+            'first_lang': 'korean',
+            'second_lang': 'english',
+            'third_lang': 'chinese',
+            'first_repeat': 0,
+            'second_repeat': 1,
+            'third_repeat': 1,  
+            'eng_voice': 'Jenny (US)',  # 국적 표시 추가
+            'kor_voice': '선희',
+            'zh_voice': '샤오샤오 (여)',  # 기본값을 샤오샤오로 설정
+            'jp_voice': 'Nanami',
+            'vi_voice': 'HoaiMy',
+            'start_row': 1,
+            'end_row': 50,
+            'selected_sheet': 'en600 : 생활회화 600문장',  # 기본 시트 설정 수정
+            'word_delay': 1,
+            'spacing': 1.0,          # 기본값 1.0으로 명시
+            'subtitle_delay': 1.0,   # 기본값 1.0으로 명시
+            'next_sentence_time': 1.0,  # 기본값 1.0으로 명시
+            'english_speed': 1.2,
+            'korean_speed': 1.2,
+            'chinese_speed': 1.2,
+            'japanese_speed': 1.2,
+            'vietnamese_speed': 1.2,
+            'keep_subtitles': True,
+            'break_enabled': True,
+            'break_interval': 10,
+            'break_duration': 10,
+            'auto_repeat': True,
+            'repeat_count': 3,  # 기본값 3으로 변경
+            'english_font': 'Pretendard',
+            'korean_font': 'Pretendard',
+            'chinese_font': 'SimSun',
+            'english_font_size': 32,
+            'korean_font_size': 25,
+            'chinese_font_size': 32,
+            'japanese_font': 'PretendardJP-Light',
+            'japanese_font_size': 28,
+            'hide_subtitles': {
+                'first_lang': False,
+                'second_lang': False,
+                'third_lang': False,
+            },
+            'english_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
+            'korean_color': '#00FF00',   # 다크모드: 초록색, 브라이트모드: 검정색
+            'chinese_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
+            'japanese_color': '#00FF00' if is_dark_mode else '#FFFFFF',  # 다크모드: 초록색, 라이트모드: 흰색
+            'vietnamese_color': '#00FF00' if is_dark_mode else '#FFFFFF',  # 다크모드: 초록색, 라이트모드: 흰색
+            'japanese_speed': 2.0,  # 일본어 배속 기본값 추가
+            'vietnamese_font': 'Arial',  # 베트남어 폰트 기본값 추가
+            'vietnamese_font_size': 30,
+            'vietnamese_speed': 1.2,
+            'healing_music': False,
+            'healing_duration': 60,  # 힐링뮤직 기본 재생 시간 1분으로 변경
+            'voice_notification': True,
+            'notification_voice': '선희',  # 기본 알림 음성
+        }
+
     # break.wav 파일 존재 여부 확인
     break_sound_path = SCRIPT_DIR / './base/break.wav'
     if not break_sound_path.exists():
@@ -213,79 +471,73 @@ def initialize_session_state():
         except Exception as e:
             st.error(f"알림음 생성 오류: {e}")
 
-    # 베트남어 음성 설정 확실히 초기화
-    if 'vi_voice' not in st.session_state.settings:
-        st.session_state.settings['vi_voice'] = 'HoaiMy'
-    
-    # 설정 저장
-    save_settings(st.session_state.settings)
+    # 설정 로드 시 백업 생성
+    if 'settings' in st.session_state:
+        st.session_state.settings_backup = st.session_state.settings.copy()
 
 def create_settings_ui(return_to_learning=False):
-    """설정 화면 UI 생성 (return_to_learning: 학습 화면으로 복귀 여부)"""
-    settings = st.session_state.settings
+    # 함수 시작 부분에 settings 초기화 추가
+    settings = st.session_state.settings.copy()
+    
+    # 설정 백업 복원 (취소 시 사용)
+    if return_to_learning and 'settings_backup' in st.session_state:
+        settings = st.session_state.settings_backup.copy()
+    else:
+        settings = st.session_state.settings.copy()
 
     if return_to_learning:
         # 학습 중 설정 모드 - 간소화된 UI
         st.subheader("학습 설정")
         
-        # 자동 반복 설정
-        repeat_options = ['없음', '1', '2', '3', '4', '5']
-        current_repeat = str(settings.get('repeat_count', '3'))
-        if current_repeat not in repeat_options:
-            current_repeat = '3'  # 기본값
-        settings['repeat_count'] = st.selectbox(
-            "자동 반복(횟수)",
-            options=repeat_options,
-            index=repeat_options.index(current_repeat),
-            key="repeat_count_learning"
-        )
-        settings['auto_repeat'] = settings['repeat_count'] != '없음'
-        if settings['auto_repeat']:
-            settings['repeat_count'] = int(settings['repeat_count'])
+        # 시트 선택 옵션 추가
+        sheet_names = get_excel_sheets()
+        current_sheet_display = settings.get('selected_sheet', sheet_names[0])
+        if current_sheet_display not in sheet_names:
+            current_sheet_display = sheet_names[0]
 
-        # 휴식 간격 설정
-        break_options = ['없음', '5', '10', '15', '20']
-        current_break = str(settings.get('break_interval', '10'))
-        if current_break not in break_options:
-            current_break = '10'  # 기본값
-        settings['break_interval'] = st.selectbox(
-            "휴식 간격(문장)",
-            options=break_options,
-            index=break_options.index(current_break),
-            key="break_interval_learning"
+        selected_sheet_display = st.selectbox(
+            "엑셀 시트 선택",
+            options=sheet_names,
+            index=sheet_names.index(current_sheet_display),
+            key="sheet_select_main"
         )
-        settings['break_enabled'] = settings['break_interval'] != '없음'
-        if settings['break_enabled']:
-            settings['break_interval'] = int(settings['break_interval'])
 
-        # 음악 듣기 설정
-        final_sound_options = ['없음', '30초', '1분', '1분30초']
-        final_sound_mapping = {'없음': 0, '30초': 30, '1분': 60, '1분30초': 90}
-        current_duration = '1분'  # 기본값
-        for option, duration in final_sound_mapping.items():
-            if duration == settings.get('final_sound_duration', 60):
-                current_duration = option
-                break
-        selected_duration = st.selectbox(
-            "종료 후 음악 듣기",
-            options=final_sound_options,
-            index=final_sound_options.index(current_duration),
-            key="final_sound_duration_learning"
-        )
-        settings['final_sound_enabled'] = selected_duration != '없음'
-        settings['final_sound_duration'] = final_sound_mapping[selected_duration]
+        # 실제 시트명 추출
+        selected_sheet = get_sheet_name_from_display(selected_sheet_display)
 
-        # 저장/취소 버튼
-        col1, col2 = st.columns([0.8, 0.2])
-        with col1:
-            if st.button("💾 저장 후 학습 재개", type="primary"):
-                save_settings(settings)
-                st.session_state.page = 'learning'
-                st.rerun()
-        with col2:
-            if st.button("❌ 취소"):
-                st.session_state.page = 'learning'
-                st.rerun()
+        # 시트가 변경되었을 때
+        if selected_sheet != get_sheet_name_from_display(settings.get('selected_sheet', 'Sheet1')):
+            df, last_row = read_excel_data(selected_sheet)
+            if df is not None and last_row > 0:
+                settings['selected_sheet'] = selected_sheet  # 실제 시트명만 저장
+                settings['start_row'] = 1
+                settings['end_row'] = last_row  # 전체 행 수로 설정
+                st.info(f"시트 변경: 행 범위가 자동으로 조정. (1-{last_row})")
+
+        # 선택된 시트의 행 수 표시
+        try:
+            df, last_row = read_excel_data(selected_sheet)
+            if df is not None and last_row > 0:
+                st.info(f"선택된 시트의 총 행 수: {last_row}")
+                
+                # 시작 행과 종료 행 설정
+                settings['start_row'] = st.number_input(
+                    "시작 행",
+                    min_value=1,
+                    max_value=last_row,
+                    value=min(settings.get('start_row', 1), last_row),
+                    key="start_row_input"
+                )
+                
+                settings['end_row'] = st.number_input(
+                    "종료 행",
+                    min_value=1,  # 최소값을 1로 설정하여 시작 행과 무관하게 입력 가능
+                    max_value=last_row,
+                    value=min(settings.get('end_row', last_row), last_row),
+                    key="end_row_input"
+                )
+        except Exception as e:
+            st.error(f"시트 정보 읽기 오류: {e}")
     else:
         # 기본 설정 모드 - 전체 UI
         # 다크 모드 감지
@@ -313,7 +565,84 @@ def create_settings_ui(return_to_learning=False):
                     'japanese_color': '#FFFFFF',
                     'vietnamese_color': '#FFFFFF',
                 })
+
+        # 부제목 스타일 CSS 추가
+        st.markdown("""
+            <style>
+                /* 부제목(subheader) 스타일 */
+                .custom-subheader {
+                    font-size: 1.3rem !important;
+                    font-weight: 600 !important;
+                    margin-top: 1.5rem !important;
+                    margin-bottom: 1rem !important;
+                    color: #00FF7F !important;  /* 스프링그린 색상 */
+                    padding: 0.2rem 0;
+                    border-bottom: 2px solid #00FF7F;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        # 부제목 커스텀 함수
+        def custom_subheader(text):
+            st.markdown(f'<div class="custom-subheader">{text}</div>', unsafe_allow_html=True)
+
+        # 기존 subheader 대신 custom_subheader 사용
+        custom_subheader("엑셀 시트 설정")
+        sheet_names = get_excel_sheets()
+        current_sheet_display = settings.get('selected_sheet', sheet_names[0])
+        if current_sheet_display not in sheet_names:
+            current_sheet_display = sheet_names[0]
         
+        col1, col2 = st.columns(2)
+        with col1:
+            # 시트 선택
+            selected_sheet_display = st.selectbox(
+                "학습할 시트 선택",
+                options=sheet_names,
+                index=sheet_names.index(current_sheet_display),
+                key="sheet_select_main"
+            )
+            
+            # 실제 시트명 추출
+            selected_sheet = get_sheet_name_from_display(selected_sheet_display)
+            
+            # 시트가 변경되었을 때
+            if selected_sheet != get_sheet_name_from_display(settings['selected_sheet']):
+                df, last_row = read_excel_data(selected_sheet)
+                if df is not None:
+                    settings['selected_sheet'] = selected_sheet_display  # 행 수 정보를 포함한 전체 표시명 저장
+                    settings['start_row'] = 1
+                    settings['end_row'] = min(50, last_row)  # 기본값은 50행 또는 마지막 행
+                    st.info(f"시트 변경: 행 범위가 자동으로 조정. (1-{settings['end_row']})")
+            
+            # 선택된 시트의 행 수 표시
+            try:
+                df, last_row = read_excel_data(selected_sheet)
+                if df is not None:
+                    st.info(f"선택된 시트의 총 행 수: {last_row}")
+            except Exception as e:
+                st.error(f"시트 정보 읽기 오류: {e}")
+        
+        with col2:
+            # 시작 행과 종료 행 설정
+            df, last_row = read_excel_data(settings['selected_sheet'])
+            if df is not None:
+                settings['start_row'] = st.number_input(
+                    "시작 행",
+                    min_value=1,
+                    max_value=last_row,
+                    value=min(settings['start_row'], last_row),
+                    key="start_row_input"
+                )
+                
+                settings['end_row'] = st.number_input(
+                    "종료 행",
+                    min_value=1,  # 최소값을 1로 설정하여 시작 행과 무관하게 입력 가능
+                    max_value=last_row,
+                    value=min(settings['end_row'], last_row),
+                    key="end_row_input"
+                )
+
         # CSS 스타일 추가 (다크 모드 대응)
         st.markdown("""
             <style>
@@ -408,8 +737,36 @@ def create_settings_ui(return_to_learning=False):
             
             # 학습 시작 버튼 (첫 화면에서만 표시)
             if st.button("▶️ 학습 시작", use_container_width=True, key="start_btn"):
-                st.session_state.page = 'learning'
-                st.rerun()
+                # 시작행과 종료행 검증
+                try:
+                    df, last_row = read_excel_data(settings['selected_sheet'])
+                    if df is None:
+                        st.error("엑셀 파일을 읽을 수 없습니다.")
+                        return
+                    
+                    # 행 범위 검증
+                    start_row = settings['start_row']
+                    end_row = settings['end_row']
+                    
+                    if start_row < 1 or end_row < 1:
+                        st.error("시작행과 종료행은 1 이상이어야 합니다.")
+                        return
+                    
+                    if start_row > end_row:
+                        st.error("시작행은 종료행보다 작거나 같아야 합니다.")
+                        return
+                    
+                    if end_row > last_row:
+                        st.error(f"종료행이 시트의 총 행 수({last_row})를 초과할 수 없습니다.")
+                        return
+                    
+                    # 모든 검증 통과 시 학습 시작
+                    st.session_state.page = 'learning'
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"오류 발생: {e}")
+                    return
 
         # 학습 시작 버튼 스타일
         st.markdown("""
@@ -423,112 +780,125 @@ def create_settings_ui(return_to_learning=False):
             </style>
         """, unsafe_allow_html=True)
 
-        # 시작/종료 번호와 반복 횟수 설정
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            settings['start_row'] = st.number_input("시작번호",
-                                                  value=settings['start_row'],
-                                                  min_value=1,
-                                                  max_value=max_row,
-                                                  key="start_row_input",
-                                                  format="%d")
-        with col2:
-            settings['end_row'] = st.number_input("종료번호",
-                                                value=settings['end_row'],
-                                                min_value=1,
-                                                max_value=max_row,
-                                                key="end_row_input",
-                                                format="%d")
-        with col3:
-            settings['repeat_count'] = st.selectbox("반복 횟수",
-                                                 options=['없음', '1', '2', '3', '4', '5'],
-                                                 index=0 if not settings.get('auto_repeat', True) else settings.get('repeat_count', 5),
-                                                 key="repeat_count_input")
-            settings['auto_repeat'] = settings['repeat_count'] != '없음'
-            if settings['auto_repeat']:
-                settings['repeat_count'] = int(settings['repeat_count'])
-
-        # 언어 순위 설정
-        st.subheader("자막 | 음성 | 속도")
+        # 언어 순서 설정 섹션의 제목 수정
+        custom_subheader("자막 · 음성 · 속도")
         col1, col2, col3 = st.columns(3)
         with col1:
-            settings['first_lang'] = st.selectbox("1번째     언어",
+            settings['first_lang'] = st.selectbox("1순위 언어",
                 options=['korean', 'english', 'chinese', 'japanese', 'vietnamese'],
                 index=['korean', 'english', 'chinese', 'japanese', 'vietnamese'].index(settings['first_lang']),
                 format_func=lambda x: LANG_DISPLAY[x],
                 key="settings_first_lang")
-            # 음성 재생 횟수를 선택박스로 변경
-            current_repeat = max(1, min(settings.get('first_repeat', 1), 5))  # 1-5 사이로 제한
-            settings['first_repeat'] = st.selectbox("음성 재생(횟수)",
-                                      options=list(range(0, 3)),  # 1-5회
-                                      index=current_repeat-1,  # 0-based index
-                                      key="first_repeat")
-            # 배속을 선택박스로 변경 (0.8부터 시작)
-            speed_options = [round(x * 0.2, 1) for x in range(4, 21)]  # 0.8-4.0배, 0.2간격
-            speed_key = f"{settings['first_lang']}_speed"
-            current_speed = round(float(settings.get(speed_key, 1.2)), 1)
-            current_speed = max(0.8, min(current_speed, 4.0))
-            try:
-                speed_index = speed_options.index(current_speed)
-            except ValueError:
-                speed_index = speed_options.index(1.2)
-            settings[speed_key] = st.selectbox("음성 속도(배)",
-                                     options=speed_options,
-                                     index=speed_index,
-                                     key="first_speed")
+            
+            # 1순위 언어의 음성 선택
+            first_lang_voices = VOICE_MAPPING[settings['first_lang']]
+            voice_key = f"{settings['first_lang'][:2]}_voice"
+            current_voice = settings.get(voice_key)
+            if not current_voice or current_voice not in first_lang_voices:
+                current_voice = list(first_lang_voices.keys())[0]
+                settings[voice_key] = current_voice
+            
+            settings[voice_key] = st.selectbox("음성 선택",
+                options=list(first_lang_voices.keys()),
+                index=list(first_lang_voices.keys()).index(current_voice),
+                key=f"first_voice")
+            
+            # 음성 재생 횟수 설정 추가
+            settings['first_repeat'] = st.selectbox("재생 횟수",
+                options=list(range(0, 3)),  # 02회
+                index=settings.get('first_repeat', 0),
+                key="first_repeat")
+            
+            # 배속 설정 추가
+            speed_options = [0.8, 1, 1.5, 2, 2.5, 3, 3.5, 4]
+            current_speed = float(settings.get(f"{settings['first_lang']}_speed", 1.2))
+            closest_speed = min(speed_options, key=lambda x: abs(x - current_speed))
+            settings[f"{settings['first_lang']}_speed"] = st.selectbox(
+                "배속",
+                options=speed_options,
+                index=speed_options.index(closest_speed),
+                format_func=lambda x: f"{x}배속",
+                key=f"first_speed"
+            )
 
         with col2:
-            settings['second_lang'] = st.selectbox("2번째 언어",
+            settings['second_lang'] = st.selectbox("2순위 언어",
                 options=['korean', 'english', 'chinese', 'japanese', 'vietnamese'],
                 index=['korean', 'english', 'chinese', 'japanese', 'vietnamese'].index(settings['second_lang']),
                 format_func=lambda x: LANG_DISPLAY[x],
                 key="settings_second_lang")
-            # 음성 재생 횟수를 선택박스로 변경
-            current_repeat = max(1, min(settings.get('second_repeat', 1), 5))  # 1-5 사이로 제한
-            settings['second_repeat'] = st.selectbox("음성 재생(횟수)",
-                                       options=list(range(1, 3)),  # 1-5회
-                                       index=current_repeat-1,  # 0-based index
-                                       key="second_repeat")
-            # 배속을 선택박스로 변경
-            speed_key = f"{settings['second_lang']}_speed"
-            current_speed = round(float(settings.get(speed_key, 1.2)), 1)
-            current_speed = max(0.8, min(current_speed, 4.0))
-            try:
-                speed_index = speed_options.index(current_speed)
-            except ValueError:
-                speed_index = speed_options.index(1.2)
-            settings[speed_key] = st.selectbox("음성 속도(배)",
-                                      options=speed_options,
-                                      index=speed_index,
-                                      key="second_speed")
+            
+            # 2순위 언어의 음성 선택
+            second_lang_voices = VOICE_MAPPING[settings['second_lang']]
+            voice_key = f"{settings['second_lang'][:2]}_voice"
+            current_voice = settings.get(voice_key)
+            if not current_voice or current_voice not in second_lang_voices:
+                current_voice = list(second_lang_voices.keys())[0]
+                settings[voice_key] = current_voice
+            
+            settings[voice_key] = st.selectbox("음성 선택",
+                options=list(second_lang_voices.keys()),
+                index=list(second_lang_voices.keys()).index(current_voice),
+                key=f"second_voice")
+            
+            # 음성 재생 횟수 설정 추가
+            settings['second_repeat'] = st.selectbox("재생 횟수",
+                options=list(range(0, 3)),  # 0-5회
+                index=settings.get('second_repeat', 1),
+                key="second_repeat")
+            
+            # 배속 설정 추가
+            speed_options = [0.8, 1, 1.5, 2, 2.5, 3, 3.5, 4]
+            current_speed = float(settings.get(f"{settings['second_lang']}_speed", 1.2))
+            closest_speed = min(speed_options, key=lambda x: abs(x - current_speed))
+            settings[f"{settings['second_lang']}_speed"] = st.selectbox(
+                "배속",
+                options=speed_options,
+                index=speed_options.index(closest_speed),
+                format_func=lambda x: f"{x}배속",
+                key=f"second_speed"
+            )
 
         with col3:
-            settings['third_lang'] = st.selectbox("3번째 언어",
+            settings['third_lang'] = st.selectbox("3순위 언어",
                 options=['korean', 'english', 'chinese', 'japanese', 'vietnamese'],
                 index=['korean', 'english', 'chinese', 'japanese', 'vietnamese'].index(settings['third_lang']),
                 format_func=lambda x: LANG_DISPLAY[x],
                 key="settings_third_lang")
-            # 음성 재생 횟수를 선택박스로 변경
-            current_repeat = max(1, min(settings.get('third_repeat', 1), 5))  # 1-5 사이로 제한
-            settings['third_repeat'] = st.selectbox("음성 재생(횟수)",
-                                      options=list(range(1, 3)),  # 1-5회
-                                      index=current_repeat-1,  # 0-based index
-                                      key="third_repeat")
-            # 배속을 선택박스로 변경
-            speed_key = f"{settings['third_lang']}_speed"
-            current_speed = round(float(settings.get(speed_key, 1.2)), 1)
-            current_speed = max(0.8, min(current_speed, 4.0))
-            try:
-                speed_index = speed_options.index(current_speed)
-            except ValueError:
-                speed_index = speed_options.index(1.2)
-            settings[speed_key] = st.selectbox("음성 속도(배)",
-                                     options=speed_options,
-                                     index=speed_index,
-                                     key="third_speed")
+            
+            # 3순위 언어의 음성 선택
+            third_lang_voices = VOICE_MAPPING[settings['third_lang']]
+            voice_key = f"{settings['third_lang'][:2]}_voice"
+            current_voice = settings.get(voice_key)
+            if not current_voice or current_voice not in third_lang_voices:
+                current_voice = list(third_lang_voices.keys())[0]
+                settings[voice_key] = current_voice
+            
+            settings[voice_key] = st.selectbox("음성 선택",
+                options=list(third_lang_voices.keys()),
+                index=list(third_lang_voices.keys()).index(current_voice),
+                key=f"third_voice")
+            
+            # 음성 재생 횟수 설정 추가
+            settings['third_repeat'] = st.selectbox("재생 횟수",
+                options=list(range(0, 3)),  # 0-5회
+                index=settings.get('third_repeat', 1),
+                key="third_repeat")
+            
+            # 배속 설정 추가
+            speed_options = [0.8, 1, 1.5, 2, 2.5, 3, 3.5, 4]
+            current_speed = float(settings.get(f"{settings['third_lang']}_speed", 1.2))
+            closest_speed = min(speed_options, key=lambda x: abs(x - current_speed))
+            settings[f"{settings['third_lang']}_speed"] = st.selectbox(
+                "배속",
+                options=speed_options,
+                index=speed_options.index(closest_speed),
+                format_func=lambda x: f"{x}배속",
+                key=f"third_speed"
+            )
 
         # 문장 재생 설정
-        st.subheader("문장 재생")
+        custom_subheader("문장 재생")
         col1, col2, col3, col4 = st.columns(4)
         
         # 0.1초부터 2초까지 0.1초 간격의 옵션 생성
@@ -587,20 +957,20 @@ def create_settings_ui(return_to_learning=False):
                                                   value=settings.get('keep_subtitles', True),
                                                   key="keep_subtitles_checkbox")
         with col2:
-            hide_first = st.checkbox("1번째 자막 숨김",
+            hide_first = st.checkbox("1순위 자막 숨김",
                                    value=settings['hide_subtitles']['first_lang'],
                                    key="first_hide")
         with col3:
-            hide_second = st.checkbox("2번째 자막 숨김",
+            hide_second = st.checkbox("2순위 자막 숨김",
                                     value=settings['hide_subtitles']['second_lang'],
                                     key="second_hide")
         with col4:
-            hide_third = st.checkbox("3번째 자막 숨김",
+            hide_third = st.checkbox("3순위 자막 숨김",
                                    value=settings['hide_subtitles']['third_lang'],
                                    key="third_hide")
 
-        # 폰트 및 색상 설정 섹션
-        st.subheader("폰트 크기 | 색깔")
+        # 폰트 및 색상 설정 섹션의 제목 수정
+        custom_subheader("폰트 크기 · 색깔")  # 구분자를 '|'에서 '·'로 변경
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             settings['korean_font_size'] = st.number_input("한글",
@@ -720,18 +1090,14 @@ def create_settings_ui(return_to_learning=False):
         """, unsafe_allow_html=True)
 
         # 저장/취소 버튼
-        col1, col2 = st.columns([0.8, 0.2])
+        col1, _ = st.columns([1, 0.2])  # 취소 버튼 컬럼 제거
         with col1:
-            if st.button("💾 저장 후 학습 재개", type="primary"):
-                save_settings(settings)
-                if return_to_learning:
+            if st.button("💾 저장 후 학습 재개", type="primary", key="save_and_resume"):
+                if save_settings(settings):  # 설정 저장 성공 시
+                    st.session_state.settings = settings.copy()  # 세션 상태 업데이트
+                    st.session_state.settings_backup = settings.copy()  # 백업 업데이트
                     st.session_state.page = 'learning'
-                    st.rerun()
-        with col2:
-            if st.button("❌ 취소"):
-                if return_to_learning:
-                    st.session_state.page = 'learning'
-                    st.rerun()
+                    st.rerun()  # 즉시 학습 화면으로 전환
 
         # 저장/취소 버튼 스타일
         st.markdown("""
@@ -741,74 +1107,155 @@ def create_settings_ui(return_to_learning=False):
                     background-color: #00FF00 !important;
                     color: black !important;
                 }
-                /* 취소 버튼 스타일 */
-                div[data-testid="stButton"] > button:last-child {
-                    background-color: #FF0000 !important;
-                    color: white !important;
-                }
             </style>
         """, unsafe_allow_html=True)
 
-        # 엑셀 시트 선택 옵션 추가
-        try:
-            # 엑셀 파일에서 시트 목록 가져오기
-            excel = pd.ExcelFile(EXCEL_PATH)
-            sheet_names = excel.sheet_names
+        # 중국어 음성 선택 부분 수정 (3순위 언어가 중국어일 때)
+        if settings['third_lang'] == 'chinese':
+            voice_key = 'zh_voice'
+            current_voice = settings.get(voice_key)
             
-            # 시트 선택
-            selected_sheet = st.selectbox(
-                "학습할 시트 선택",
-                options=sheet_names,
-                index=sheet_names.index(settings.get('selected_sheet', 'Sheet1')),
-                key="sheet_select"
+            # 현재 음성이 유효하지 않은 경우 기본값으로 설정
+            if not current_voice or current_voice not in VOICE_MAPPING['chinese']:
+                current_voice = '샤오샤오 (여)'
+                settings[voice_key] = current_voice
+            
+            # 음성 선택 UI
+            new_voice = st.selectbox(
+                "음성 선택",
+                options=list(VOICE_MAPPING['chinese'].keys()),
+                index=list(VOICE_MAPPING['chinese'].keys()).index(current_voice),
+                key="chinese_voice_select"
             )
-            settings['selected_sheet'] = selected_sheet
             
-        except Exception as e:
-            st.error(f"엑셀 시트 목록 가져오기 오류: {e}")
+            # 음성이 변경되었을 때
+            if new_voice != current_voice:
+                settings[voice_key] = new_voice
+                save_voice_settings(settings)  # 설정 저장
+                st.session_state.settings = settings.copy()  # 세션 상태 업데이트
+                st.experimental_rerun()
 
-def get_voice_mapping(language, voice_setting):
-    """안전하게 음성 매핑을 가져오는 함수"""
-    try:
-        # 기본값 설정
-        default_voices = {
-            'korean': '선희',
-            'english': 'Steffan',
-            'chinese': 'Yunjian',
-            'japanese': 'Nanami',
-            'vietnamese': 'HoaiMy'
-        }
-        
-        # 설정된 음성이 없거나 매핑에 없는 경우 기본값 사용
-        if not voice_setting or voice_setting not in VOICE_MAPPING.get(language, {}):
-            voice_setting = default_voices.get(language)
-            
-        return VOICE_MAPPING[language][voice_setting]
-    except Exception as e:
-        st.error(f"음성 매핑 오류 ({language}): {str(e)}")
-        # 기본값 반환
-        return VOICE_MAPPING[language][default_voices[language]]
+        # 문장 재생 설정 부분 수정
+        custom_subheader("학습 설정")
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            # 브레이크 설정
+            settings['break_enabled'] = st.checkbox(
+                "브레이크 사용",
+                value=settings.get('break_enabled', True),
+                help="설정한 문장 수마다 휴식 시간을 가집니다."
+            )
+            if settings['break_enabled']:
+                settings['break_interval'] = st.selectbox(
+                    "브레이크 간격",
+                    options=[5, 10, 15, 20],
+                    index=[5, 10, 15, 20].index(settings.get('break_interval', 10)),
+                    help="몇 문장마다 브레이크를 가질지 설정"
+                )
+                settings['break_duration'] = st.slider(
+                    "브레이크 시간(초)",
+                    min_value=5,
+                    max_value=30,
+                    value=settings.get('break_duration', 10),
+                    step=5
+                )
+
+        with col2:
+            # 자동 반복 설정
+            settings['auto_repeat'] = st.checkbox(
+                "자동 반복",
+                value=settings.get('auto_repeat', True),
+                help="학습이 끝나면 자동으로 반복합니다."
+            )
+            if settings['auto_repeat']:
+                settings['repeat_count'] = st.selectbox(
+                    "반복 횟수",
+                    options=list(range(6)),  # 0-5회
+                    index=min(settings.get('repeat_count', 3), 5),
+                    format_func=lambda x: f"{x}회",
+                    help="총 몇 번 반복할지 설정"
+                )
+
+        with col3:
+            # 힐링뮤직 설정
+            settings['healing_music'] = st.checkbox(
+                "힐링뮤직",
+                value=settings.get('healing_music', False),
+                help="브레이크 타임에 힐링뮤직을 재생합니다."
+            )
+            if settings['healing_music']:
+                col_time1, col_time2 = st.columns(2)
+                with col_time1:
+                    minutes = st.number_input(
+                        "분",
+                        min_value=0,
+                        max_value=5,
+                        value=settings.get('healing_duration', 60) // 60,
+                        help="힐링뮤직 재생 시간(분)"
+                    )
+                with col_time2:
+                    seconds = st.number_input(
+                        "초",
+                        min_value=0,
+                        max_value=59,
+                        value=settings.get('healing_duration', 60) % 60,
+                        help="힐링뮤직 재생 시간(초)"
+                    )
+                settings['healing_duration'] = minutes * 60 + seconds
+
+        with col4:
+            # 음성 알림 설정
+            settings['voice_notification'] = st.checkbox(
+                "음성 알림",
+                value=settings.get('voice_notification', True),
+                help="브레이크 시작/종료를 음성으로 알립니다."
+            )
+            if settings['voice_notification']:
+                notification_voices = {
+                    '선희 (여)': 'ko-KR-SunHiNeural',
+                    '인준 (남)': 'ko-KR-InJoonNeural'
+                }
+                settings['notification_voice'] = st.selectbox(
+                    "알림 음성",
+                    options=list(notification_voices.keys()),
+                    index=list(notification_voices.keys()).index('선희 (여)' if settings.get('notification_voice') == '선희' else '인준 (남)'),
+                    help="알림에 사용할 음성 선택"
+                )
 
 async def create_audio(text, voice, speed=1.0):
-    """음성 파일 생성 함수 수정"""
+    """
+    음성 파일 생성 - 베트남어도 edge-tts 사용
+    """
     try:
         if not text or not voice:
             return None
 
-        output_file = TEMP_DIR / f"temp_{int(time.time()*1000)}.wav"
-        
-        # 속도 설정을 percentage로 변환
-        if speed > 1:
-            rate_str = f"+{int((speed - 1) * 100)}%"
-        else:
-            rate_str = f"-{int((1 - speed) * 100)}%"
+        # 베트남어도 edge-tts 사용
+        if voice == 'vi-VN':
+            voice = 'vi-VN-HoaiMyNeural'  # edge-tts의 베트남어 음성
 
-        communicate = edge_tts.Communicate(text, voice, rate=rate_str)
-        await communicate.save(str(output_file))
-        return str(output_file)
+        output_file = TEMP_DIR / f"temp_{int(time.time()*1000)}.wav"
+        try:
+            if speed > 1:
+                rate_str = f"+{int((speed - 1) * 100)}%"
+            else:
+                rate_str = f"-{int((1 - speed) * 100)}%"
+
+            communicate = edge_tts.Communicate(text, voice, rate=rate_str)
+            await communicate.save(str(output_file))
+            return str(output_file)
+
+        except Exception as e:
+            st.error(f"음성 생성 오류: {str(e)}")
+            traceback.print_exc()
+            if output_file.exists():
+                output_file.unlink()
+            return None
 
     except Exception as e:
         st.error(f"음성 생성 오류: {str(e)}")
+        traceback.print_exc()
         return None
 
 def create_learning_ui():
@@ -824,43 +1271,37 @@ def create_learning_ui():
         # 배속 정보 표시
         speed_info = []
         
-        # 순위에 따라 실제 재생되는 음성의 배속만 표시
-        for lang, repeat in [
-            (st.session_state.settings['first_lang'], st.session_state.settings['first_repeat']),
-            (st.session_state.settings['second_lang'], st.session_state.settings['second_repeat']),
-            (st.session_state.settings['third_lang'], st.session_state.settings['third_repeat'])
-        ]:
-            if repeat > 0:  # 재생 횟수가 0보다 큰 경우만 표시
-                speed = st.session_state.settings.get(f'{lang}_speed', 1.2)
-                speed_text = str(int(speed)) if speed.is_integer() else f"{speed:.1f}"
-                
-                # 언어별 한글 표시
-                lang_display = {
-                    'korean': '한글',
-                    'english': '영어',
-                    'chinese': '중국어',
-                    'japanese': '일본어',
-                    'vietnamese': '베트남어'
-                }.get(lang, lang)
-                
-                speed_info.append(f"{lang_display} {speed_text}배")
+        # 한글 배속 정보
+        ko_speed = st.session_state.settings['korean_speed']
+        ko_speed_text = str(int(ko_speed)) if ko_speed == int(ko_speed) else f"{ko_speed:.1f}"  # 수정
+        speed_info.append(f"한글 {ko_speed_text}배")
+        
+        # 영어 배속 정보
+        eng_speed = st.session_state.settings['english_speed']
+        eng_speed_text = str(int(eng_speed)) if eng_speed == int(eng_speed) else f"{eng_speed:.1f}"  # 수정
+        speed_info.append(f"영어 {eng_speed_text}배")
+        
+        # 중국어 배속 정보
+        zh_speed = st.session_state.settings['chinese_speed']
+        zh_speed_text = str(int(zh_speed)) if zh_speed == int(zh_speed) else f"{zh_speed:.1f}"  # 수정
+        speed_info.append(f"중국어 {zh_speed_text}배")
+        
+        # 베트남어 배속 정보
+        vn_speed = st.session_state.settings['vietnamese_speed']
+        vn_speed_text = str(int(vn_speed)) if vn_speed == int(vn_speed) else f"{vn_speed:.1f}"  # 수정
+        speed_info.append(f"베트남어 {vn_speed_text}배")
+        
+        # 배속 정보를 하나의 문자열로 결합
+        speed_display = " · ".join(speed_info)
     
-    with col2:
-        if st.button("⚙️ 설정"):
-            st.session_state.page = 'settings_from_learning'
-            st.rerun()
-        if st.button("⏹️ 종료"):
-            st.session_state.page = 'settings'
-            st.rerun()
-
     # 자막을 위한 빈 컨테이너
     subtitles = [st.empty() for _ in range(3)]
 
-    return progress, status, subtitles, speed_info
+    return progress, status, subtitles
 
 async def create_break_audio():
     """브레이크 음성 생성"""
-    break_msg = "쉬어가는 시간입니다, 5초간의 호흡을 느껴보세요"
+    break_msg = "쉬는 시간입니다, 5초간의 여유를 느껴보세요"
     break_voice = VOICE_MAPPING['korean']['선희']
     audio_file = await create_audio(break_msg, break_voice, 1.0)
     return audio_file
@@ -869,35 +1310,41 @@ async def start_learning():
     """학습 시작"""
     settings = st.session_state.settings
     sentence_count = 0
-    repeat_count = 0
+    repeat_count = 0  # 현재 반복 횟수
     
     # 엑셀에서 문장 가져오기
     try:
-        # 엑셀 파일 읽기 - 선택된 시트 사용
-        df = pd.read_excel(
-            EXCEL_PATH,
-            sheet_name=settings.get('selected_sheet', 'Sheet1'),
-            header=None,
-            engine='openpyxl'
-        )
+        # 엑셀 파일 읽기
+        df, last_row = read_excel_data(settings['selected_sheet'])
+        if df is None:
+            st.error("엑셀 파일을 읽을 수 없습니다.")
+            return
+            
+        # 행 범위 검증
+        if settings['start_row'] > last_row or settings['end_row'] > last_row:
+            st.error(f"선택한 행 범위가 유효하지 않습니다. (시트의 총 행 수: {last_row})")
+            return
+            
         start_idx = settings['start_row'] - 1
         end_idx = settings['end_row'] - 1
         
-        # 필요한 열만 선택 (존재하는 열만)
-        english = df.iloc[start_idx:end_idx+1, 0].tolist()  # A열: 영어
-        korean = df.iloc[start_idx:end_idx+1, 1].tolist()   # B열: 한국어
-        chinese = df.iloc[start_idx:end_idx+1, 2].tolist()  # C열: 중국어
-        japanese = df.iloc[start_idx:end_idx+1, 3].tolist() # D열: 일본어
+        # 기본 3개 언어 데이터 가져오기
+        selected_data = df.iloc[start_idx:end_idx+1, :3]
+        english = selected_data.iloc[:, 0].tolist()
+        korean = selected_data.iloc[:, 1].tolist()
+        chinese = selected_data.iloc[:, 2].tolist()
         
-        # 베트남어 열이 있는 경우에만 읽기
-        vietnamese = []
-        if len(df.columns) > 4:  # E열이 존재하는 경우
-            vietnamese = df.iloc[start_idx:end_idx+1, 4].tolist()
-        else:
-            vietnamese = [""] * (end_idx - start_idx + 1)  # 빈 문자열로 채우기
+        # 베트남어와 일본어는 열이 있는 경우에만 가져오기
+        vietnamese = df.iloc[start_idx:end_idx+1, 3].tolist() if len(df.columns) > 3 else [''] * len(english)
+        japanese = df.iloc[start_idx:end_idx+1, 4].tolist() if len(df.columns) > 4 else [''] * len(english)
         
         total_sentences = len(english)
         
+        # 데이터 유효성 검사
+        if not all(english) or not all(korean) or not all(chinese):
+            st.error("필수 언어(영어, 한국어, 중국어) 데이터가 비어있는 행이 있습니다.")
+            return
+            
     except PermissionError:
         st.error("엑셀 파일이 다른 프로그램에서 열려있습니다. 파일을 닫고 다시 시도해주세요.")
         return
@@ -905,10 +1352,22 @@ async def start_learning():
         st.error(f"엑셀 파일 읽기 오류: {e}")
         return
 
-    # 학습 UI 생성 및 배속 정보 가져오기
-    progress, status, subtitles, speed_info = create_learning_ui()
+    # 학습 UI 생성
+    progress, status, subtitles = create_learning_ui()
     
-    # 자막을 위한 빈 컨테이너
+    # 상단 컨트롤 패널 - 학습 종료 및 설정 버튼
+    with st.container():
+        col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
+        with col2:
+            if st.button("⚙️ 설정", key="settings_btn"):
+                st.session_state.page = 'settings_from_learning'
+                st.rerun()
+        with col3:
+            if st.button("⏹️ 종료", key="stop_btn"):
+                st.session_state.page = 'settings'
+                st.rerun()
+
+    # 자막 표시를 위한 빈 컨테이너
     subtitles = [st.empty() for _ in range(3)]
     
     # 이전 문장 자막 저장용 변수
@@ -918,31 +1377,11 @@ async def start_learning():
         for i, (eng, kor, chn, jpn, vn) in enumerate(zip(english, korean, chinese, japanese, vietnamese)):
             # 언어별 텍스트와 음성 매핑
             lang_mapping = {
-                'korean': {
-                    'text': kor, 
-                    'voice': get_voice_mapping('korean', settings.get('kor_voice')), 
-                    'speed': settings.get('korean_speed', 1.2)
-                },
-                'english': {
-                    'text': eng, 
-                    'voice': get_voice_mapping('english', settings.get('eng_voice')), 
-                    'speed': settings.get('english_speed', 1.2)
-                },
-                'chinese': {
-                    'text': chn, 
-                    'voice': get_voice_mapping('chinese', settings.get('zh_voice')), 
-                    'speed': settings.get('chinese_speed', 1.2)
-                },
-                'japanese': {
-                    'text': jpn, 
-                    'voice': get_voice_mapping('japanese', settings.get('jp_voice')), 
-                    'speed': settings.get('japanese_speed', 1.2)
-                },
-                'vietnamese': {
-                    'text': vn, 
-                    'voice': get_voice_mapping('vietnamese', settings.get('vi_voice')), 
-                    'speed': settings.get('vietnamese_speed', 1.2)
-                }
+                'korean': {'text': kor, 'voice': VOICE_MAPPING['korean'][settings['kor_voice']], 'speed': settings['korean_speed']},
+                'english': {'text': eng, 'voice': VOICE_MAPPING['english'][settings['en_voice']], 'speed': settings['english_speed']},
+                'chinese': {'text': chn, 'voice': VOICE_MAPPING['chinese'][settings['zh_voice']], 'speed': settings['chinese_speed']},
+                'japanese': {'text': jpn, 'voice': VOICE_MAPPING['japanese'][settings['jp_voice']], 'speed': settings['japanese_speed']},
+                'vietnamese': {'text': vn, 'voice': VOICE_MAPPING['vietnamese'][settings['vi_voice']], 'speed': settings['vietnamese_speed']}
             }
 
             progress.progress((i + 1) / total_sentences)
@@ -951,28 +1390,26 @@ async def start_learning():
             speed_info = []
             
             # 순위에 따라 실제 재생되는 음성의 배속만 표시
-            for lang, repeat in [
-                (settings['first_lang'], settings['first_repeat']),
-                (settings['second_lang'], settings['second_repeat']),
-                (settings['third_lang'], settings['third_repeat'])
-            ]:
-                if repeat > 0:  # 재생 횟수가 0보다 큰 경우만 표시
-                    speed = settings.get(f'{lang}_speed', 1.2)
-                    speed_text = str(int(speed)) if speed.is_integer() else f"{speed:.1f}"
-                    
-                    # 언어별 한글 표시
-                    lang_display = {
-                        'korean': '한글',
-                        'english': '영어',
-                        'chinese': '중국어',
-                        'japanese': '일본어',
-                        'vietnamese': '베트남어'
-                    }.get(lang, lang)
-                    
-                    speed_info.append(f"{lang_display} {speed_text}배")
+            for lang in [settings['first_lang'], settings['second_lang'], settings['third_lang']]:
+                if lang == 'korean' and settings['first_repeat'] > 0:
+                    ko_speed = settings['korean_speed']
+                    ko_speed_text = str(int(ko_speed)) if ko_speed == int(ko_speed) else f"{ko_speed:.1f}"
+                    speed_info.append(f"한글 {ko_speed_text}배")
+                elif lang == 'english' and settings['second_repeat'] > 0:
+                    eng_speed = settings['english_speed']
+                    eng_speed_text = str(int(eng_speed)) if eng_speed == int(eng_speed) else f"{eng_speed:.1f}"
+                    speed_info.append(f"영어 {eng_speed_text}배")
+                elif lang == 'chinese' and settings['third_repeat'] > 0:
+                    zh_speed = settings['chinese_speed']
+                    zh_speed_text = str(int(zh_speed)) if zh_speed == int(zh_speed) else f"{zh_speed:.1f}"
+                    speed_info.append(f"중국어 {zh_speed_text}배")
+                elif lang == 'vietnamese' and settings['third_repeat'] > 0:  # 베트남어 추가
+                    vn_speed = settings['vietnamese_speed']
+                    vn_speed_text = str(int(vn_speed)) if vn_speed == int(vn_speed) else f"{vn_speed:.1f}"
+                    speed_info.append(f"베트남어 {vn_speed_text}배")
             
             # 배속 정보를 하나의 문자열로 결합
-            speed_display = " | ".join(speed_info)
+            speed_display = " · ".join(speed_info)
             
             # 문장 번호 계산 (엑셀 행 번호 사용)
             sentence_number = start_idx + i + 1
@@ -1087,7 +1524,7 @@ async def start_learning():
                         await asyncio.sleep(1)  # 알림음이 완전히 재생될 때까지 대기
                     
                     # 2. 브레이크 음성 메시지 생성 및 재생
-                    break_msg = "쉬어가는 시간입니다, 5초간의 호흡을 느껴보세요"
+                    break_msg = "쉬는 시간입니다, 5초간의 휴식을 느껴보세요"
                     break_audio = await create_audio(break_msg, VOICE_MAPPING['korean']['선희'], 1.0)
                     if break_audio:
                         play_audio(break_audio)
@@ -1136,7 +1573,7 @@ async def start_learning():
                     st.session_state.page = 'settings'
                     st.rerun()
                     break
-                
+            
         except Exception as e:
             st.error(f"완료 알림음 재생 오류: {e}")
             traceback.print_exc()
@@ -1149,8 +1586,7 @@ def create_personalized_ui():
     selected_language = st.selectbox(
         "사용할 언어를 선택하세요",
         options=['korean', 'english', 'chinese', 'japanese', 'vietnamese'],
-        index=['korean', 'english', 'chinese', 'japanese', 'vietnamese'].index(st.session_state.user_language)
-    )
+        index=['korean', 'english', 'chinese', 'japanese', 'vietnamese'].index(st.session_state.user_language))
 
     # 선택한 언어를 세션 상태에 저장
     if selected_language != st.session_state.user_language:
@@ -1178,17 +1614,39 @@ def main():
     elif st.session_state.page == 'settings_from_learning':
         create_settings_ui(return_to_learning=True)  # 학습 중 설정 모드
     elif st.session_state.page == 'learning':
-        asyncio.run(start_learning())
+        asyncio.run(start_learning())  # 학습 시작
     elif st.session_state.page == 'personalized':
         create_personalized_ui()
 
 def save_settings(settings):
     """설정값을 파일에 저장"""
     try:
+        # 설정 파일 저장 전 백업 생성
+        if SETTINGS_PATH.exists():
+            backup_path = SETTINGS_PATH.with_suffix('.json.bak')
+            import shutil
+            shutil.copy2(SETTINGS_PATH, backup_path)
+        
+        # 새로운 설정 저장
         with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
             json.dump(settings, f, ensure_ascii=False, indent=2)
+            
+        # 성공적으로 저장되었는지 확인
+        if SETTINGS_PATH.exists():
+            return True
     except Exception as e:
         st.error(f"설정 저장 중 오류: {e}")
+        # 오류 발생 시 백업에서 복구 시도
+        try:
+            backup_path = SETTINGS_PATH.with_suffix('.json.bak')
+            if backup_path.exists():
+                import shutil
+                shutil.copy2(backup_path, SETTINGS_PATH)
+                st.warning("백업에서 설정을 복구했습니다.")
+        except Exception as backup_error:
+            st.error(f"백업 복구 중 오류: {backup_error}")
+        return False
+    return True
 
 def save_study_time():
     """학습 시간을 파일에 저장"""
@@ -1384,6 +1842,35 @@ def handle_resume_learning(df):
     except Exception as e:
         st.error(f"학습 재개 중 오류 발생: {str(e)}")
         return 0
+
+# 음성 선택 변경 시 즉시 설정을 저장하는 함수 추가
+def save_voice_settings(settings):
+    """음성 설정을 즉시 저장"""
+    try:
+        # 현재 설정 파일 읽기
+        if SETTINGS_PATH.exists():
+            with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
+                current_settings = json.load(f)
+        else:
+            current_settings = {}
+        
+        # 음성 관련 설정 업데이트
+        current_settings.update({
+            'eng_voice': settings['eng_voice'],
+            'kor_voice': settings['kor_voice'],
+            'zh_voice': settings['zh_voice'],
+            'jp_voice': settings['jp_voice'],
+            'vi_voice': settings['vi_voice']
+        })
+        
+        # 설정 파일 저장
+        with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(current_settings, f, ensure_ascii=False, indent=2)
+            
+        return True
+    except Exception as e:
+        st.error(f"음성 설정 저장 중 오류: {e}")
+        return False
 
 if __name__ == "__main__":
     main()
