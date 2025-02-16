@@ -1178,10 +1178,29 @@ async def create_break_audio():
 async def start_learning():
     """학습 시작"""
     settings = st.session_state.settings  # 세션에 저장된 설정 불러오기
-    sentence_count = 0
-    repeat_count = 0  # 현재 반복 횟수
     
-    # 엑셀에서 문장 가져오기
+    # 음성 설정 검증 및 초기화
+    voice_defaults = {
+        'eng_voice': 'Jenny (US)',
+        'kor_voice': '선희',
+        'zh_voice': '샤오샤오 (여)',
+        'jp_voice': 'Nanami',
+        'vi_voice': 'HoaiMy'
+    }
+    
+    # 음성 설정 검증
+    for key, default in voice_defaults.items():
+        lang = key.split('_')[0]  # eng, kor, zh, jp, vi
+        lang_full = {'eng': 'english', 'kor': 'korean', 'zh': 'chinese', 'jp': 'japanese', 'vi': 'vietnamese'}[lang]
+        
+        if key not in settings or settings[key] not in VOICE_MAPPING[lang_full]:
+            st.warning(f"Invalid {lang_full} voice setting. Resetting to default.")
+            settings[key] = default
+    
+    # 나머지 코드는 그대로 유지
+    sentence_count = 0
+    repeat_count = 0
+    
     try:
         # 엑셀 파일 읽기
         df, last_row = read_excel_data(settings['selected_sheet'])
