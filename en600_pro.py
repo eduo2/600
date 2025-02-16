@@ -18,7 +18,7 @@ from gtts import gTTS
 from pydub import AudioSegment
 import io
 
-## streamlit run en600st/en600_st_pro.py
+## streamlit run en600st/en600_st_pro2.py
 
 # 기본 경로 설정
 SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -85,8 +85,8 @@ if not SETTINGS_PATH.exists():
         'vietnamese_font': 'Arial',  # 베트남어 폰트 기본값 추가
         'vietnamese_font_size': 30,
         'vietnamese_speed': 1.2,
-        'healing_music': False,
-        'healing_duration': 60,  # 힐링뮤직 기본 재생 시간 1분으로 변경
+        'healing_music': True,  # 기본값을 True로 변경
+        'healing_duration': 90,  # 기본값을 90초로 변경
         'voice_notification': True,
         'notification_voice': '선희',  # 기본 알림 음성
     }
@@ -454,8 +454,8 @@ def initialize_session_state():
             'vietnamese_font': 'Arial',  # 베트남어 폰트 기본값 추가
             'vietnamese_font_size': 30,
             'vietnamese_speed': 1.2,
-            'healing_music': False,
-            'healing_duration': 60,  # 힐링뮤직 기본 재생 시간 1분으로 변경
+            'healing_music': True,  # 기본값을 True로 변경
+            'healing_duration': 90,  # 기본값을 90초로 변경
             'voice_notification': True,
             'notification_voice': '선희',  # 기본 알림 음성
         }
@@ -897,6 +897,31 @@ def create_settings_ui(return_to_learning=False):
                 key=f"third_speed"
             )
 
+        # 중국어 음성 선택 부분 수정 (3순위 언어가 중국어일 때)
+        if settings['third_lang'] == 'chinese':
+            voice_key = 'zh_voice'
+            current_voice = settings.get(voice_key)
+            
+            # 현재 음성이 유효하지 않은 경우 기본값으로 설정
+            if not current_voice or current_voice not in VOICE_MAPPING['chinese']:
+                current_voice = '샤오샤오 (여)'
+                settings[voice_key] = current_voice
+            
+            # 음성 선택 UI
+            new_voice = st.selectbox(
+                "음성 선택",
+                options=list(VOICE_MAPPING['chinese'].keys()),
+                index=list(VOICE_MAPPING['chinese'].keys()).index(current_voice),
+                key="chinese_voice_select"
+            )
+            
+            # 음성이 변경되었을 때
+            if new_voice != current_voice:
+                settings[voice_key] = new_voice
+                save_voice_settings(settings)  # 설정 저장
+                st.session_state.settings = settings.copy()  # 세션 상태 업데이트
+                st.experimental_rerun()
+
         # 문장 재생 설정
         custom_subheader("문장 재생")
         col1, col2, col3, col4 = st.columns(4)
@@ -1110,31 +1135,6 @@ def create_settings_ui(return_to_learning=False):
             </style>
         """, unsafe_allow_html=True)
 
-        # 중국어 음성 선택 부분 수정 (3순위 언어가 중국어일 때)
-        if settings['third_lang'] == 'chinese':
-            voice_key = 'zh_voice'
-            current_voice = settings.get(voice_key)
-            
-            # 현재 음성이 유효하지 않은 경우 기본값으로 설정
-            if not current_voice or current_voice not in VOICE_MAPPING['chinese']:
-                current_voice = '샤오샤오 (여)'
-                settings[voice_key] = current_voice
-            
-            # 음성 선택 UI
-            new_voice = st.selectbox(
-                "음성 선택",
-                options=list(VOICE_MAPPING['chinese'].keys()),
-                index=list(VOICE_MAPPING['chinese'].keys()).index(current_voice),
-                key="chinese_voice_select"
-            )
-            
-            # 음성이 변경되었을 때
-            if new_voice != current_voice:
-                settings[voice_key] = new_voice
-                save_voice_settings(settings)  # 설정 저장
-                st.session_state.settings = settings.copy()  # 세션 상태 업데이트
-                st.experimental_rerun()
-
         # 문장 재생 설정 부분 수정
         custom_subheader("학습 설정")
         col1, col2, col3, col4 = st.columns(4)
@@ -1148,17 +1148,16 @@ def create_settings_ui(return_to_learning=False):
             )
             if settings['break_enabled']:
                 settings['break_interval'] = st.selectbox(
-                    "브레이크 간격",
-                    options=[5, 10, 15, 20],
-                    index=[5, 10, 15, 20].index(settings.get('break_interval', 10)),
+                    "브레이크 간격(문장)",
+                    options=[5, 10, 20, 50],
+                    index=[5, 10, 20, 50].index(settings.get('break_interval', 10)),
                     help="몇 문장마다 브레이크를 가질지 설정"
                 )
-                settings['break_duration'] = st.slider(
+                settings['break_duration'] = st.selectbox(
                     "브레이크 시간(초)",
-                    min_value=5,
-                    max_value=30,
-                    value=settings.get('break_duration', 10),
-                    step=5
+                    options=[5, 10, 15, 20, 25, 30],
+                    index=[5, 10, 15, 20, 25, 30].index(settings.get('break_duration', 10)),
+                    help="브레이크 시간 설정"
                 )
 
         with col2:
@@ -1171,38 +1170,26 @@ def create_settings_ui(return_to_learning=False):
             if settings['auto_repeat']:
                 settings['repeat_count'] = st.selectbox(
                     "반복 횟수",
-                    options=list(range(6)),  # 0-5회
+                    options=list(range(6)),
                     index=min(settings.get('repeat_count', 3), 5),
                     format_func=lambda x: f"{x}회",
                     help="총 몇 번 반복할지 설정"
                 )
 
         with col3:
-            # 힐링뮤직 설정
+            # 힐링뮤직 설정 수정
             settings['healing_music'] = st.checkbox(
                 "힐링뮤직",
-                value=settings.get('healing_music', False),
+                value=settings.get('healing_music', True),  # 기본값을 True로 변경
                 help="브레이크 타임에 힐링뮤직을 재생합니다."
             )
             if settings['healing_music']:
-                col_time1, col_time2 = st.columns(2)
-                with col_time1:
-                    minutes = st.number_input(
-                        "분",
-                        min_value=0,
-                        max_value=5,
-                        value=settings.get('healing_duration', 60) // 60,
-                        help="힐링뮤직 재생 시간(분)"
-                    )
-                with col_time2:
-                    seconds = st.number_input(
-                        "초",
-                        min_value=0,
-                        max_value=59,
-                        value=settings.get('healing_duration', 60) % 60,
-                        help="힐링뮤직 재생 시간(초)"
-                    )
-                settings['healing_duration'] = minutes * 60 + seconds
+                settings['healing_duration'] = st.selectbox(
+                    "재생 시간(초)",
+                    options=[30, 60, 90],  # 30, 60, 90초 옵션
+                    index=[30, 60, 90].index(settings.get('healing_duration', 90)),  # 기본값 90초
+                    help="힐링뮤직 재생 시간"
+                )
 
         with col4:
             # 음성 알림 설정
