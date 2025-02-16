@@ -18,7 +18,7 @@ from gtts import gTTS
 from pydub import AudioSegment
 import io
 
-## streamlit run en600st/en600_st_pro2.py
+## streamlit run en600st/en600_pro.py
 
 # 기본 경로 설정
 SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -1128,22 +1128,22 @@ def create_learning_ui():
         
         # 한글 배속 정보
         ko_speed = st.session_state.settings['korean_speed']
-        ko_speed_text = str(int(ko_speed)) if ko_speed == int(ko_speed) else f"{ko_speed:.1f}"  # 수정
+        ko_speed_text = str(int(ko_speed)) if ko_speed == int(ko_speed) else f"{ko_speed:.1f}"
         speed_info.append(f"한글 {ko_speed_text}배")
         
         # 영어 배속 정보
         eng_speed = st.session_state.settings['english_speed']
-        eng_speed_text = str(int(eng_speed)) if eng_speed == int(eng_speed) else f"{eng_speed:.1f}"  # 수정
+        eng_speed_text = str(int(eng_speed)) if eng_speed == int(eng_speed) else f"{eng_speed:.1f}"
         speed_info.append(f"영어 {eng_speed_text}배")
         
         # 중국어 배속 정보
         zh_speed = st.session_state.settings['chinese_speed']
-        zh_speed_text = str(int(zh_speed)) if zh_speed == int(zh_speed) else f"{zh_speed:.1f}"  # 수정
+        zh_speed_text = str(int(zh_speed)) if zh_speed == int(zh_speed) else f"{zh_speed:.1f}"
         speed_info.append(f"중국어 {zh_speed_text}배")
         
         # 베트남어 배속 정보
         vn_speed = st.session_state.settings['vietnamese_speed']
-        vn_speed_text = str(int(vn_speed)) if vn_speed == int(vn_speed) else f"{vn_speed:.1f}"  # 수정
+        vn_speed_text = str(int(vn_speed)) if vn_speed == int(vn_speed) else f"{vn_speed:.1f}"
         speed_info.append(f"베트남어 {vn_speed_text}배")
         
         # 배속 정보를 하나의 문자열로 결합
@@ -1151,6 +1151,21 @@ def create_learning_ui():
     
     # 자막을 위한 빈 컨테이너
     subtitles = [st.empty() for _ in range(3)]
+
+    # 모든 텍스트를 초록색으로 설정하는 CSS 추가
+    st.markdown("""
+        <style>
+            div[data-testid="stMarkdownContainer"] p {
+                color: #00FF00 !important;
+            }
+            div.stMarkdown p {
+                color: #00FF00 !important;
+            }
+            .element-container div {
+                color: #00FF00 !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
     return progress, status, subtitles
 
@@ -1233,7 +1248,7 @@ async def start_learning():
             # 언어별 텍스트와 음성 매핑
             lang_mapping = {
                 'korean': {'text': kor, 'voice': VOICE_MAPPING['korean'][settings['kor_voice']], 'speed': settings['korean_speed']},
-                'english': {'text': eng, 'voice': VOICE_MAPPING['english'][settings['en_voice']], 'speed': settings['english_speed']},
+                'english': {'text': eng, 'voice': VOICE_MAPPING['english'][settings['eng_voice']], 'speed': settings['english_speed']},  # en_voice를 eng_voice로 수정
                 'chinese': {'text': chn, 'voice': VOICE_MAPPING['chinese'][settings['zh_voice']], 'speed': settings['chinese_speed']},
                 'japanese': {'text': jpn, 'voice': VOICE_MAPPING['japanese'][settings['jp_voice']], 'speed': settings['japanese_speed']},
                 'vietnamese': {'text': vn, 'voice': VOICE_MAPPING['vietnamese'][settings['vi_voice']], 'speed': settings['vietnamese_speed']}
