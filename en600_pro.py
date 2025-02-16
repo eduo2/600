@@ -402,63 +402,7 @@ def initialize_session_state():
                 os.remove(SETTINGS_PATH)
         
         # 저장된 설정이 없거나 유효하지 않으면 기본값 사용
-        st.session_state.settings = {
-            'first_lang': 'korean',
-            'second_lang': 'english',
-            'third_lang': 'chinese',
-            'first_repeat': 0,
-            'second_repeat': 1,
-            'third_repeat': 1,  
-            'eng_voice': 'Jenny (US)',  # 국적 표시 추가
-            'kor_voice': '선희',
-            'zh_voice': '샤오샤오 (여)',  # 기본값을 샤오샤오로 설정
-            'jp_voice': 'Nanami',
-            'vi_voice': 'HoaiMy',
-            'start_row': 1,
-            'end_row': 50,
-            'selected_sheet': 'en600 : 생활회화 600문장',  # 기본 시트 설정 수정
-            'word_delay': 1,
-            'spacing': 1.0,          # 기본값 1.0으로 명시
-            'subtitle_delay': 1.0,   # 기본값 1.0으로 명시
-            'next_sentence_time': 1.0,  # 기본값 1.0으로 명시
-            'english_speed': 1.2,
-            'korean_speed': 1.2,
-            'chinese_speed': 1.2,
-            'japanese_speed': 1.2,
-            'vietnamese_speed': 1.2,
-            'keep_subtitles': True,
-            'break_enabled': True,
-            'break_interval': 10,
-            'break_duration': 10,
-            'auto_repeat': True,
-            'repeat_count': 3,  # 기본값 3으로 변경
-            'english_font': 'Pretendard',
-            'korean_font': 'Pretendard',
-            'chinese_font': 'SimSun',
-            'english_font_size': 32,
-            'korean_font_size': 25,
-            'chinese_font_size': 32,
-            'japanese_font': 'PretendardJP-Light',
-            'japanese_font_size': 28,
-            'hide_subtitles': {
-                'first_lang': False,
-                'second_lang': False,
-                'third_lang': False,
-            },
-            'english_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
-            'korean_color': '#00FF00',   # 다크모드: 초록색, 브라이트모드: 검정색
-            'chinese_color': '#00FF00',  # 다크모드: 초록색, 브라이트모드: 검정색
-            'japanese_color': '#00FF00' if is_dark_mode else '#FFFFFF',  # 다크모드: 초록색, 라이트모드: 흰색
-            'vietnamese_color': '#00FF00' if is_dark_mode else '#FFFFFF',  # 다크모드: 초록색, 라이트모드: 흰색
-            'japanese_speed': 2.0,  # 일본어 배속 기본값 추가
-            'vietnamese_font': 'Arial',  # 베트남어 폰트 기본값 추가
-            'vietnamese_font_size': 30,
-            'vietnamese_speed': 1.2,
-            'healing_music': True,  # 기본값을 True로 변경
-            'healing_duration': 90,  # 기본값을 90초로 변경
-            'voice_notification': True,
-            'notification_voice': '선희',  # 기본 알림 음성
-        }
+        st.session_state.settings = default_settings.copy()
 
     # break.wav 파일 존재 여부 확인
     break_sound_path = SCRIPT_DIR / './base/break.wav'
@@ -477,13 +421,14 @@ def initialize_session_state():
 
 def create_settings_ui(return_to_learning=False):
     # 함수 시작 부분에 settings 초기화 추가
-    settings = st.session_state.settings.copy()
-    
+    if 'settings' not in st.session_state:
+        st.session_state.settings = default_settings.copy()
+
+    settings = st.session_state.settings
+
     # 설정 백업 복원 (취소 시 사용)
     if return_to_learning and 'settings_backup' in st.session_state:
         settings = st.session_state.settings_backup.copy()
-    else:
-        settings = st.session_state.settings.copy()
 
     if return_to_learning:
         # 학습 중 설정 모드 - 간소화된 UI
@@ -495,12 +440,14 @@ def create_settings_ui(return_to_learning=False):
         if current_sheet_display not in sheet_names:
             current_sheet_display = sheet_names[0]
 
-        selected_sheet_display = st.selectbox(
-            "엑셀 시트 선택",
-            options=sheet_names,
-            index=sheet_names.index(current_sheet_display),
-            key="sheet_select_main"
-        )
+        col1, col2 = st.columns([0.7, 0.3])
+        with col1:
+            selected_sheet_display = st.selectbox(
+                "엑셀 시트 선택",
+                options=sheet_names,
+                index=sheet_names.index(current_sheet_display),
+                key="sheet_select_main"
+            )
 
         # 실제 시트명 추출
         selected_sheet = get_sheet_name_from_display(selected_sheet_display)
@@ -520,24 +467,96 @@ def create_settings_ui(return_to_learning=False):
             if df is not None and last_row > 0:
                 st.info(f"선택된 시트의 총 행 수: {last_row}")
                 
-                # 시작 행과 종료 행 설정
-                settings['start_row'] = st.number_input(
-                    "시작 행",
-                    min_value=1,
-                    max_value=last_row,
-                    value=min(settings.get('start_row', 1), last_row),
-                    key="start_row_input"
-                )
+                # 빠른 선택 버튼들
+                col1, col2, col3, col4 = st.columns(4)
                 
-                settings['end_row'] = st.number_input(
-                    "종료 행",
-                    min_value=1,  # 최소값을 1로 설정하여 시작 행과 무관하게 입력 가능
-                    max_value=last_row,
-                    value=min(settings.get('end_row', last_row), last_row),
-                    key="end_row_input"
-                )
+                with col1:
+                    if st.button("처음 50개", key="first_50_main"):
+                        settings['start_row'] = 1
+                        settings['end_row'] = min(50, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                with col2:
+                    if st.button("다음 50개", key="next_50_main"):
+                        current_end = settings.get('end_row', 50)
+                        settings['start_row'] = current_end + 1
+                        settings['end_row'] = min(current_end + 50, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                with col3:
+                    if st.button("처음 100개", key="first_100_main"):
+                        settings['start_row'] = 1
+                        settings['end_row'] = min(100, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                with col4:
+                    if st.button("다음 100개", key="next_100_main"):
+                        current_end = settings.get('end_row', 100)
+                        settings['start_row'] = current_end + 1
+                        settings['end_row'] = min(current_end + 100, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                # 수동 입력 필드
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_row = st.number_input(
+                        "시작 행",
+                        min_value=1,
+                        max_value=last_row,
+                        value=settings.get('start_row', 1),
+                        key="start_row_input_main"
+                    )
+                    settings['start_row'] = start_row
+                    # 설정 즉시 저장
+                    st.session_state.settings = settings.copy()
+                
+                with col2:
+                    end_row = st.number_input(
+                        "종료 행",
+                        min_value=settings['start_row'],
+                        max_value=last_row,
+                        value=min(settings.get('end_row', last_row), last_row),
+                        key="end_row_input_main"
+                    )
+                    settings['end_row'] = end_row
+                    # 설정 즉시 저장
+                    st.session_state.settings = settings.copy()
+                
+                # 선택된 범위 표시
+                st.info(f"선택된 범위: {settings['start_row']} - {settings['end_row']} (총 {settings['end_row'] - settings['start_row'] + 1}개)")
+                
         except Exception as e:
             st.error(f"시트 정보 읽기 오류: {e}")
+
+        # 저장 및 학습 재개 버튼 추가
+        if st.button("💾 저장 후 학습 재개", type="primary", key="save_and_resume_learning"):
+            if save_settings(settings):  # 설정 파일에 저장
+                st.session_state.settings_backup = settings.copy()  # 백업 업데이트
+                st.session_state.page = 'learning'
+                st.rerun()
+
+        # 저장 버튼 스타일
+        st.markdown("""
+            <style>
+                /* 저장 버튼 스타일 */
+                div[data-testid="stButton"] > button:first-child {
+                    background-color: #00FF00 !important;
+                    color: black !important;
+                    width: 100% !important;
+                    margin-top: 1rem !important;
+                }
+                
+                /* 빠른 선택 버튼 스타일 */
+                div[data-testid="stButton"] > button {
+                    width: 100% !important;
+                    margin: 0.2rem 0 !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
     else:
         # 기본 설정 모드 - 전체 UI
         # 다크 모드 감지
@@ -593,189 +612,131 @@ def create_settings_ui(return_to_learning=False):
         if current_sheet_display not in sheet_names:
             current_sheet_display = sheet_names[0]
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([0.7, 0.3])
         with col1:
-            # 시트 선택
             selected_sheet_display = st.selectbox(
-                "학습할 시트 선택",
+                "엑셀 시트 선택",
                 options=sheet_names,
                 index=sheet_names.index(current_sheet_display),
                 key="sheet_select_main"
             )
-            
-            # 실제 시트명 추출
-            selected_sheet = get_sheet_name_from_display(selected_sheet_display)
-            
-            # 시트가 변경되었을 때
-            if selected_sheet != get_sheet_name_from_display(settings['selected_sheet']):
-                df, last_row = read_excel_data(selected_sheet)
-                if df is not None:
-                    settings['selected_sheet'] = selected_sheet_display  # 행 수 정보를 포함한 전체 표시명 저장
-                    settings['start_row'] = 1
-                    settings['end_row'] = min(50, last_row)  # 기본값은 50행 또는 마지막 행
-                    st.info(f"시트 변경: 행 범위가 자동으로 조정. (1-{settings['end_row']})")
-            
-            # 선택된 시트의 행 수 표시
-            try:
-                df, last_row = read_excel_data(selected_sheet)
-                if df is not None:
-                    st.info(f"선택된 시트의 총 행 수: {last_row}")
-            except Exception as e:
-                st.error(f"시트 정보 읽기 오류: {e}")
-        
-        with col2:
-            # 시작 행과 종료 행 설정
-            df, last_row = read_excel_data(settings['selected_sheet'])
-            if df is not None:
-                settings['start_row'] = st.number_input(
-                    "시작 행",
-                    min_value=1,
-                    max_value=last_row,
-                    value=min(settings['start_row'], last_row),
-                    key="start_row_input"
-                )
-                
-                settings['end_row'] = st.number_input(
-                    "종료 행",
-                    min_value=1,  # 최소값을 1로 설정하여 시작 행과 무관하게 입력 가능
-                    max_value=last_row,
-                    value=min(settings['end_row'], last_row),
-                    key="end_row_input"
-                )
 
-        # CSS 스타일 추가 (다크 모드 대응)
+        # 실제 시트명 추출
+        selected_sheet = get_sheet_name_from_display(selected_sheet_display)
+
+        # 시트가 변경되었을 때
+        if selected_sheet != get_sheet_name_from_display(settings.get('selected_sheet', 'Sheet1')):
+            df, last_row = read_excel_data(selected_sheet)
+            if df is not None and last_row > 0:
+                settings['selected_sheet'] = selected_sheet  # 실제 시트명만 저장
+                settings['start_row'] = 1
+                settings['end_row'] = last_row  # 전체 행 수로 설정
+                st.info(f"시트 변경: 행 범위가 자동으로 조정. (1-{last_row})")
+
+        # 선택된 시트의 행 수 표시
+        try:
+            df, last_row = read_excel_data(selected_sheet)
+            if df is not None and last_row > 0:
+                st.info(f"선택된 시트의 총 행 수: {last_row}")
+                
+                # 빠른 선택 버튼들
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    if st.button("처음 50개", key="first_50_main"):
+                        settings['start_row'] = 1
+                        settings['end_row'] = min(50, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                with col2:
+                    if st.button("다음 50개", key="next_50_main"):
+                        current_end = settings.get('end_row', 50)
+                        settings['start_row'] = current_end + 1
+                        settings['end_row'] = min(current_end + 50, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                with col3:
+                    if st.button("처음 100개", key="first_100_main"):
+                        settings['start_row'] = 1
+                        settings['end_row'] = min(100, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                with col4:
+                    if st.button("다음 100개", key="next_100_main"):
+                        current_end = settings.get('end_row', 100)
+                        settings['start_row'] = current_end + 1
+                        settings['end_row'] = min(current_end + 100, last_row)
+                        # 설정 즉시 저장
+                        st.session_state.settings = settings.copy()
+                
+                # 수동 입력 필드
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_row = st.number_input(
+                        "시작 행",
+                        min_value=1,
+                        max_value=last_row,
+                        value=settings.get('start_row', 1),
+                        key="start_row_input_main"
+                    )
+                    settings['start_row'] = start_row
+                    # 설정 즉시 저장
+                    st.session_state.settings = settings.copy()
+                
+                with col2:
+                    end_row = st.number_input(
+                        "종료 행",
+                        min_value=settings['start_row'],
+                        max_value=last_row,
+                        value=min(settings.get('end_row', last_row), last_row),
+                        key="end_row_input_main"
+                    )
+                    settings['end_row'] = end_row
+                    # 설정 즉시 저장
+                    st.session_state.settings = settings.copy()
+                
+                # 선택된 범위 표시
+                st.info(f"선택된 범위: {settings['start_row']} - {settings['end_row']} (총 {settings['end_row'] - settings['start_row'] + 1}개)")
+                
+        except Exception as e:
+            st.error(f"시트 정보 읽기 오류: {e}")
+
+        # 저장 및 학습 재개 버튼 추가
+        if st.button("💾 저장 후 학습 재개", type="primary", key="save_and_resume_learning"):
+            if save_settings(settings):  # 설정 파일에 저장
+                st.session_state.settings_backup = settings.copy()  # 백업 업데이트
+                st.session_state.page = 'learning'
+                st.rerun()
+
+        # 저장 버튼 스타일
         st.markdown("""
             <style>
-                /* 기본 텍스트 색상 */
-                .st-emotion-cache-1v0mbdj {
-                    color: white !important;
-                }
-                
-                /* 제목 (h1) 폰트 크기 및 색상 조정 */
-                .st-emotion-cache-10trblm {
-                    font-size: 1.5rem !important;
-                    margin-bottom: 0px !important;
-                    color: white !important;
-                }
-                
-                /* 부제목 (h2) 폰트 크기 및 색상 조정 */
-                .st-emotion-cache-1629p8f h2 {
-                    font-size: 1.2rem !important;
+                /* 저장 버튼 스타일 */
+                div[data-testid="stButton"] > button:first-child {
+                    background-color: #00FF00 !important;
+                    color: black !important;
+                    width: 100% !important;
                     margin-top: 1rem !important;
-                    margin-bottom: 0.5rem !important;
-                    color: white !important;
                 }
                 
-                /* 입력 필드 레이블 색상 */
-                .st-emotion-cache-1a7c8b8 {
-                    color: white !important;
-                }
-                
-                /* 체크박스 및 라디오 버튼 색상 */
-                .st-emotion-cache-1a7c8b8 label {
-                    color: white !important;
-                }
-                
-                /* 숫자 입력 필드 스타일 */
-                div[data-testid="stNumberInput"] {
-                    max-width: 150px;
-                }
-                
-                /* 숫자 입력 필드 레이블 스타일 */
-                div[data-testid="stNumberInput"] label {
-                    font-size: 15px !important;
-                    color: white !important;
-                }
-                
-                /* 숫자 입력 필드 입력창 스타일 */
-                div[data-testid="stNumberInput"] input {
-                    font-size: 15px !important;
-                    padding: 4px 8px !important;
-                    color: white !important;
-                    background-color: #1E1E1E !important;
-                }
-                
-                /* 셀렉트 박스 스타일 */
-                div[data-testid="stSelectbox"] label {
-                    color: white !important;
-                }
-                
-                /* 셀렉트 박스 입력창 스타일 */
-                div[data-testid="stSelectbox"] select {
-                    color: white !important;
-                    background-color: #1E1E1E !important;
-                }
-                
-                /* 체크박스 스타일 */
-                div[data-testid="stCheckbox"] label {
-                    color: white !important;
-                }
-                
-                /* 색상 선택기 스타일 */
-                div[data-testid="stColorPicker"] label {
-                    color: white !important;
+                /* 빠른 선택 버튼 스타일 */
+                div[data-testid="stButton"] > button {
+                    width: 100% !important;
+                    margin: 0.2rem 0 !important;
                 }
             </style>
         """, unsafe_allow_html=True)
-        
-        settings = st.session_state.settings
-        col1, col2 = st.columns([0.7, 0.3])
-        with col1:
-            st.markdown('<h1 style="font-size: 1.5rem; color: #00FF00;">도파민 대충영어 : 2배 한국어</h1>', unsafe_allow_html=True)
-        with col2:
-            # 엑셀 파일에서 최대 행 수 가져오기
-            try:
-                df = pd.read_excel(
-                    EXCEL_PATH,
-                    header=None,
-                    engine='openpyxl'
-                )
-                max_row = len(df)
-            except Exception as e:
-                st.error(f"엑셀 파일 읽기 오류: {e}")
-                return
-            
-            # 학습 시작 버튼 (첫 화면에서만 표시)
-            if st.button("▶️ 학습 시작", use_container_width=True, key="start_btn"):
-                # 시작행과 종료행 검증
-                try:
-                    df, last_row = read_excel_data(settings['selected_sheet'])
-                    if df is None:
-                        st.error("엑셀 파일을 읽을 수 없습니다.")
-                        return
-                    
-                    # 행 범위 검증
-                    start_row = settings['start_row']
-                    end_row = settings['end_row']
-                    
-                    if start_row < 1 or end_row < 1:
-                        st.error("시작행과 종료행은 1 이상이어야 합니다.")
-                        return
-                    
-                    if start_row > end_row:
-                        st.error("시작행은 종료행보다 작거나 같아야 합니다.")
-                        return
-                    
-                    if end_row > last_row:
-                        st.error(f"종료행이 시트의 총 행 수({last_row})를 초과할 수 없습니다.")
-                        return
-                    
-                    # 모든 검증 통과 시 학습 시작
-                    st.session_state.page = 'learning'
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"오류 발생: {e}")
-                    return
 
-        # 학습 시작 버튼 스타일
+        # 빠른 선택 버튼 스타일 추가
         st.markdown("""
             <style>
-                /* 학습 시작/종료 버튼 스타일 */
+                /* 빠른 선택 버튼 스타일 */
                 div[data-testid="stButton"] > button {
                     width: 100% !important;
-                    height: 3em !important;
-                    font-size: 1.2rem !important;
+                    margin: 0.2rem 0 !important;
                 }
             </style>
         """, unsafe_allow_html=True)
@@ -805,7 +766,7 @@ def create_settings_ui(return_to_learning=False):
             
             # 음성 재생 횟수 설정 추가
             settings['first_repeat'] = st.selectbox("재생 횟수",
-                options=list(range(0, 3)),  # 02회
+                options=list(range(0, 3)),  # 0-2회
                 index=settings.get('first_repeat', 0),
                 key="first_repeat")
             
@@ -843,7 +804,7 @@ def create_settings_ui(return_to_learning=False):
             
             # 음성 재생 횟수 설정 추가
             settings['second_repeat'] = st.selectbox("재생 횟수",
-                options=list(range(0, 3)),  # 0-5회
+                options=list(range(0, 3)),  # 0-2회
                 index=settings.get('second_repeat', 1),
                 key="second_repeat")
             
@@ -881,7 +842,7 @@ def create_settings_ui(return_to_learning=False):
             
             # 음성 재생 횟수 설정 추가
             settings['third_repeat'] = st.selectbox("재생 횟수",
-                options=list(range(0, 3)),  # 0-5회
+                options=list(range(0, 3)),  # 0-2회
                 index=settings.get('third_repeat', 1),
                 key="third_repeat")
             
@@ -896,31 +857,6 @@ def create_settings_ui(return_to_learning=False):
                 format_func=lambda x: f"{x}배속",
                 key=f"third_speed"
             )
-
-        # 중국어 음성 선택 부분 수정 (3순위 언어가 중국어일 때)
-        if settings['third_lang'] == 'chinese':
-            voice_key = 'zh_voice'
-            current_voice = settings.get(voice_key)
-            
-            # 현재 음성이 유효하지 않은 경우 기본값으로 설정
-            if not current_voice or current_voice not in VOICE_MAPPING['chinese']:
-                current_voice = '샤오샤오 (여)'
-                settings[voice_key] = current_voice
-            
-            # 음성 선택 UI
-            new_voice = st.selectbox(
-                "음성 선택",
-                options=list(VOICE_MAPPING['chinese'].keys()),
-                index=list(VOICE_MAPPING['chinese'].keys()).index(current_voice),
-                key="chinese_voice_select"
-            )
-            
-            # 음성이 변경되었을 때
-            if new_voice != current_voice:
-                settings[voice_key] = new_voice
-                save_voice_settings(settings)  # 설정 저장
-                st.session_state.settings = settings.copy()  # 세션 상태 업데이트
-                st.experimental_rerun()
 
         # 문장 재생 설정
         custom_subheader("문장 재생")
@@ -995,7 +931,7 @@ def create_settings_ui(return_to_learning=False):
                                    key="third_hide")
 
         # 폰트 및 색상 설정 섹션의 제목 수정
-        custom_subheader("폰트 크기 · 색깔")  # 구분자를 '|'에서 '·'로 변경
+        custom_subheader("폰트 크기 · 색깔")
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             settings['korean_font_size'] = st.number_input("한글",
@@ -1067,75 +1003,7 @@ def create_settings_ui(return_to_learning=False):
                                           key="vietnamese_color_select")
             settings['vietnamese_color'] = COLOR_MAPPING[selected_color]
 
-        # 폰트 크기 변경 시 즉시 반영을 위한 CSS 업데이트
-        st.markdown(f"""
-            <style>
-                .english-text {{
-                    font-size: {settings['english_font_size']}px !important;
-                    color: {settings['english_color']} !important;
-                }}
-                .korean-text {{
-                    font-size: {settings['korean_font_size']}px !important;
-                    color: {settings['korean_color']} !important;
-                }}
-                .chinese-text {{
-                    font-size: {settings['chinese_font_size']}px !important;
-                    color: {settings['chinese_color']} !important;
-                }}
-                .japanese-text {{
-                    font-size: {settings['japanese_font_size']}px !important;
-                    color: {settings['japanese_color']} !important;
-                }}
-                .vietnamese-text {{
-                    font-size: {settings['vietnamese_font_size']}px !important;
-                    color: {settings['vietnamese_color']} !important;
-                }}
-            </style>
-        """, unsafe_allow_html=True)
-
-        # 입력 필드에 CSS 클래스 적용
-        st.markdown("""
-            <style>
-                /* 숫자 입력 필드 스타일 */
-                div[data-testid="stNumberInput"] {
-                    max-width: 150px;
-                }
-                
-                /* 숫자 입력 필드 레이블 스타일 */
-                div[data-testid="stNumberInput"] label {
-                    font-size: 15px !important;
-                }
-                
-                /* 숫자 입력 필드 입력창 스타일 */
-                div[data-testid="stNumberInput"] input {
-                    font-size: 15px !important;
-                    padding: 4px 8px !important;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # 저장/취소 버튼
-        col1, _ = st.columns([1, 0.2])  # 취소 버튼 컬럼 제거
-        with col1:
-            if st.button("💾 저장 후 학습 재개", type="primary", key="save_and_resume"):
-                if save_settings(settings):  # 설정 저장 성공 시
-                    st.session_state.settings = settings.copy()  # 세션 상태 업데이트
-                    st.session_state.settings_backup = settings.copy()  # 백업 업데이트
-                    st.session_state.page = 'learning'
-                    st.rerun()  # 즉시 학습 화면으로 전환
-
-        # 저장/취소 버튼 스타일
-        st.markdown("""
-            <style>
-                /* 저장 버튼 스타일 */
-                div[data-testid="stButton"] > button:first-child {
-                    background-color: #00FF00 !important;
-                    color: black !important;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # 문장 재생 설정 부분 수정
+        # 학습 설정
         custom_subheader("학습 설정")
         col1, col2, col3, col4 = st.columns(4)
 
@@ -1295,7 +1163,7 @@ async def create_break_audio():
 
 async def start_learning():
     """학습 시작"""
-    settings = st.session_state.settings
+    settings = st.session_state.settings  # 세션에 저장된 설정 불러오기
     sentence_count = 0
     repeat_count = 0  # 현재 반복 횟수
     
