@@ -234,7 +234,7 @@ LANG_DISPLAY = {
     'vietnamese': '베트남어'  # 베트남어 추가
 }
 
-# 음성 매핑에 남성 음성 추가
+# 음성 매핑 정의 추가
 VOICE_MAPPING = {
     'english': {
         "Jenny (US)": "en-US-JennyNeural",
@@ -258,20 +258,19 @@ VOICE_MAPPING = {
         "인준": "ko-KR-InJoonNeural"
     },
     'chinese': {
-        "샤오샤오 (여)": "zh-CN-XiaoXiaoNeural",      # 중국 여성
-        "샤오이 (여)": "zh-CN-XiaoYiNeural",          # 중국 여성
-        "샤오한 (여)": "zh-CN-XiaoHanNeural",         # 중국 여성
-        # 남성 음성
-        "윈지엔 (남)": "zh-CN-YunjianNeural",        # 중국 남성
-        "윈양 (남)": "zh-CN-YunyangNeural"           # 중국 남성
+        "샤오샤오 (여)": "zh-CN-XiaoXiaoNeural",
+        "샤오이 (여)": "zh-CN-XiaoYiNeural",
+        "샤오한 (여)": "zh-CN-XiaoHanNeural",
+        "윈지엔 (남)": "zh-CN-YunjianNeural",
+        "윈양 (남)": "zh-CN-YunyangNeural"
     },
     'japanese': {
         "Nanami": "ja-JP-NanamiNeural",
-        "Keita": "ja-JP-KeitaNeural",
+        "Keita": "ja-JP-KeitaNeural"
     },
     'vietnamese': {
-        "HoaiMy": "vi-VN-HoaiMyNeural",  # 여성 음성
-        "NamMinh": "vi-VN-NamMinhNeural"  # 남성 음성
+        "HoaiMy": "vi-VN-HoaiMyNeural",
+        "NamMinh": "vi-VN-NamMinhNeural"
     }
 }
 
