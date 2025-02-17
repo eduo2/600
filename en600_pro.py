@@ -679,7 +679,7 @@ def create_settings_ui(return_to_learning=False):
                 options=list(range(0, 3)),
                 index=int(settings.get('third_repeat', 0)),
                 key="third_repeat_select")
-        
+            
             
             settings['third_repeat'] = int(third_repeat)
             
@@ -773,11 +773,17 @@ def create_settings_ui(return_to_learning=False):
                 '#0000FF': '파란색',
                 '#FFFF00': '노란색'
             }
+            
+            # 현재 설정된 색상이 옵션에 없으면 기본값 사용
+            current_color = settings.get(f'{lang}_color', '#00FF00')
+            if current_color not in color_options:
+                current_color = '#FFFFFF' if lang == 'english' else '#00FF00'
+            
             settings[f'{lang}_color'] = st.selectbox(
                 f"{display_name} 폰트 색상",
                 options=list(color_options.keys()),
                 format_func=lambda x: color_options[x],
-                index=list(color_options.keys()).index(settings.get(f'{lang}_color', '#00FF00'))
+                index=list(color_options.keys()).index(current_color)
             )
 
     # 학습 설정
