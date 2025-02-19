@@ -892,64 +892,16 @@ def get_voice_mapping(language, voice_setting):
 
 async def get_voice_file(text, voice, speed=1.0, output_file=None):
     try:
-        # 한국어 고속 재생을 위한 처리
-        if voice.startswith("ko-") and speed > 3.0:
-            actual_speed = 2.0
-            communicate = edge_tts.Communicate(text, voice, rate=f"+{int((actual_speed-1)*100)}%")
-        else:
-            communicate = edge_tts.Communicate(text, voice, rate=f"+{int((speed-1)*100)}%")
-
+        communicate = edge_tts.Communicate(text, voice, rate=f"+{int((speed-1)*100)}%")
         if output_file is None:
-            # 임시 파일명에 타임스탬프 추가
             timestamp = int(time.time() * 1000)
             output_file = TEMP_DIR / f"temp_{voice}_{speed}_{timestamp}.wav"
-
-        # 파일이 이미 존재하면 삭제
-        if os.path.exists(output_file):
-            os.remove(output_file)
-
-        # edge-tts로 음성 파일 생성
-        await communicate.save(str(output_file))
         
-        try:
-            # librosa로 파일 로드
-            y, sr = librosa.load(str(output_file), sr=None)
-            
-            # 영어 음성인 경우 볼륨 증가
-            if voice.startswith("en-"):
-                y = y * 1.5
-                y = np.clip(y, -1.0, 1.0)
-            
-            # 한국어 고속 재생을 위한 후처리
-            if voice.startswith("ko-") and speed > 3.0:
-                speed_factor = speed / actual_speed
-                y = librosa.effects.time_stretch(y=y, rate=speed_factor)
-                y = librosa.util.normalize(y) * 1.5
-                y = np.clip(y, -1.0, 1.0)
-            
-            try:
-                # WAV 파일로 저장
-                sf.write(str(output_file), y, sr, format='WAV', subtype='PCM_16')
-                return str(output_file)
-            except Exception as write_error:
-                st.error(f"파일 저장 오류: {str(write_error)}")
-                if os.path.exists(output_file):
-                    os.remove(output_file)
-                return None
-
-        except Exception as audio_error:
-            st.error(f"오디오 처리 오류: {str(audio_error)}")
-            if os.path.exists(output_file):
-                os.remove(output_file)
-            # 원본 파일 반환 시도
-            if os.path.exists(str(output_file)):
-                return str(output_file)
-            return None
-
+        # WAV 파일로 직접 저장
+        await communicate.save(str(output_file))
+        return str(output_file)
     except Exception as e:
         st.error(f"음성 파일 생성 오류: {str(e)}")
-        if os.path.exists(output_file):
-            os.remove(output_file)
         return None
 
 def create_learning_ui():
