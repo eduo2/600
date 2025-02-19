@@ -8,16 +8,10 @@ from pathlib import Path
 import wave
 import soundfile as sf
 from PIL import Image
-import subprocess
 import numpy as np
 import traceback
 import json
 import base64
-
-from gtts import gTTS
-from pydub import AudioSegment
-import io
-import librosa
 
 ## streamlit run en600st/en600_st22.py
 
