@@ -1,31 +1,35 @@
 # Web Application
-streamlit>=1.31.0
+streamlit>=1.28.0  # 안정적인 버전으로 변경
 
 # Data Processing
-pandas>=2.2.0
-numpy>=2.1.0
+pandas>=2.0.0  # 더 넓은 호환성
+numpy<=2.1.0  # Numba compatibility requirement
 
 # Audio Processing
 edge-tts>=6.1.9
-pygame>=2.5.2
+pygame>=2.5.0  # 안정적인 버전으로 변경
 soundfile>=0.12.1
 
 # Image Processing
 Pillow>=10.0.0
 
 # Excel Support
-openpyxl>=3.1.2
+openpyxl>=3.1.0
 
 # File Management
-pathlib>=1.0.1
+pathlib>=1.0.1  # 기본 내장 모듈이므로 제거 가능
 
 # Async Support
-asyncio>=3.4.3
+asyncio>=3.4.3  # 기본 내장 모듈이므로 제거 가능
 
 # Optional Audio Processing (may not work on mobile)
 # librosa>=0.10.1  # Heavy dependency
 # pydub>=0.25.1   # Requires ffmpeg
 # gTTS>=2.5.0     # Uses mp3 format
+
+# Additional Requirements
+python-dotenv>=1.0.0
+requests>=2.31.0
 
 # Optional but recommended for better performance
 watchdog>=3.0.0
