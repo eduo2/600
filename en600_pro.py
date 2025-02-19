@@ -5,8 +5,6 @@ import asyncio
 import os
 import time
 from pathlib import Path
-import wave
-import soundfile as sf
 from PIL import Image
 import numpy as np
 import traceback
@@ -1166,21 +1164,12 @@ def get_setting(key, default_value):
 
 async def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
     """
-    HTML5 audio 태그를 사용하여 음성 파일 재생
+    HTML5 audio 태그를 사용하여 음성 파일 재생 (단순화된 버전)
     """
     try:
         if not file_path or not os.path.exists(file_path):
             st.error(f"파일 경로 오류: {file_path}")
             return
-
-        # WAV 파일에서 실제 재생 시간 계산
-        try:
-            with wave.open(file_path, 'rb') as wav_file:
-                frames = wav_file.getnframes()
-                rate = wav_file.getframerate()
-                duration = frames / float(rate)
-        except Exception:
-            duration = 2.0  # 기본 재생 시간
 
         # 파일을 base64로 인코딩
         with open(file_path, 'rb') as f:
@@ -1190,22 +1179,15 @@ async def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
         # 고유한 ID 생성
         audio_id = f"audio_{int(time.time() * 1000)}"
         
-        # HTML5 audio 요소 생성 및 자동 재생
+        # HTML5 audio 요소 생성
         st.markdown(f"""
-            <audio id="{audio_id}" autoplay="true" onended="this.remove()">
+            <audio id="{audio_id}" autoplay>
                 <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
             </audio>
-            <script>
-                const audio = document.getElementById("{audio_id}");
-                audio.play().catch(function(error) {{
-                    console.log("Audio playback failed:", error);
-                }});
-            </script>
         """, unsafe_allow_html=True)
 
-        # 대기 시간 계산
-        wait_time = duration + sentence_interval if not next_sentence else duration + 0.3
-        await asyncio.sleep(wait_time)
+        # 기본 대기 시간 사용
+        await asyncio.sleep(2.0 + sentence_interval)
 
     except Exception as e:
         st.error(f"음성 재생 오류: {str(e)}")
