@@ -1209,9 +1209,9 @@ def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
         audio_base64 = base64.b64encode(audio_bytes).decode()
         audio_id = f"audio_{int(time.time() * 1000)}"
         
-        # HTML 오디오 요소 생성
+        # HTML 오디오 요소 생성 (모바일 최적화)
         st.markdown(f"""
-            <audio id="{audio_id}" autoplay>
+            <audio id="{audio_id}" autoplay playsinline webkit-playsinline>
                 <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
             </audio>
             <script>
@@ -1219,15 +1219,31 @@ def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
                     const audio = document.getElementById("{audio_id}");
                     if (!audio) return;
                     
-                    if (window.currentAudio) {{
-                        window.currentAudio.pause();
-                        window.currentAudio.remove();
+                    // 이전 오디오 정리
+                    const prevAudio = window.currentAudio;
+                    if (prevAudio && prevAudio !== audio) {{
+                        prevAudio.pause();
+                        prevAudio.remove();
                     }}
+                    
+                    // 현재 오디오 설정
                     window.currentAudio = audio;
                     
+                    // 자동 재생 시도
+                    const playPromise = audio.play();
+                    if (playPromise) {{
+                        playPromise.catch(error => {{
+                            console.log("Auto-play prevented");
+                            audio.play();
+                        }});
+                    }}
+                    
+                    // 재생 완료 시 정리
                     audio.onended = () => {{
+                        if (window.currentAudio === audio) {{
+                            window.currentAudio = null;
+                        }}
                         audio.remove();
-                        window.currentAudio = null;
                     }};
                 }})();
             </script>
