@@ -1040,91 +1040,43 @@ async def start_learning():
 
         while True:
             for i in range(total_sentences):
-                # 자막 표시 부분을 음성 재생과 분리
-                # 1순위 자막
-                first_lang = settings['first_lang']
-                if first_lang != 'none' and not settings['hide_subtitles']['first_lang']:
-                    subtitles[0].markdown(
-                        f'<div class="first-lang-text {first_lang}-text">{text_data[first_lang][i]}</div>',
-                        unsafe_allow_html=True
-                    )
+                # 진행 상태 업데이트
+                progress.progress((i + 1) / total_sentences)
+                status.write(f"학습 진행 중... ({i + 1}/{total_sentences})")
 
-                # 2순위 자막
-                second_lang = settings['second_lang']
-                if second_lang != 'none' and not settings['hide_subtitles']['second_lang']:
-                    subtitles[1].markdown(
-                        f'<div class="second-lang-text {second_lang}-text">{text_data[second_lang][i]}</div>',
-                        unsafe_allow_html=True
-                    )
+                # 자막 표시
+                for lang, subtitle in zip(
+                    [settings['first_lang'], settings['second_lang'], settings['third_lang']], 
+                    subtitles
+                ):
+                    if lang != 'none' and not settings['hide_subtitles'].get(f'{lang}_lang', False):
+                        subtitle.markdown(
+                            f'<div class="{lang}-text">{text_data[lang][i]}</div>',
+                            unsafe_allow_html=True
+                        )
 
-                # 3순위 자막
-                third_lang = settings['third_lang']
-                if third_lang != 'none' and not settings['hide_subtitles']['third_lang']:
-                    subtitles[2].markdown(
-                        f'<div class="third-lang-text {third_lang}-text">{text_data[third_lang][i]}</div>',
-                        unsafe_allow_html=True
-                    )
-
-                # 음성 재생 부분
-                try:
-                    # 1순위 음성 재생
-                    if first_lang in VOICE_MAPPING:
-                        voice = get_voice_mapping(first_lang, settings['first_voice'])
+                # 음성 재생
+                for lang, voice_key, repeat_key in [
+                    (settings['first_lang'], 'first_voice', 'first_repeat'),
+                    (settings['second_lang'], 'second_voice', 'second_repeat'),
+                    (settings['third_lang'], 'third_voice', 'third_repeat')
+                ]:
+                    if lang in VOICE_MAPPING and settings[repeat_key] > 0:
+                        voice = get_voice_mapping(lang, settings[voice_key])
                         if voice:
-                            speed = get_speed_for_language(first_lang, 'first')
-                            for _ in range(settings['first_repeat']):
-                                try:
-                                    voice_file = await get_voice_file(text_data[first_lang][i], voice, speed)
-                                    if voice_file:
-                                        play_audio(voice_file)
-                                    if _ < settings['first_repeat'] - 1:
-                                        await asyncio.sleep(float(settings.get('spacing', 1.0)))
-                                except Exception as e:
-                                    st.error(f"1순위 음성 재생 오류: {str(e)}")
-                                    continue
-
-                    # 2순위 음성 재생
-                    if second_lang in VOICE_MAPPING:
-                        voice = get_voice_mapping(second_lang, settings['second_voice'])
-                        if voice:
-                            speed = get_speed_for_language(second_lang, 'second')
-                            for _ in range(settings['second_repeat']):
-                                try:
-                                    voice_file = await get_voice_file(text_data[second_lang][i], voice, speed)
-                                    if voice_file:
-                                        play_audio(voice_file)
-                                    if _ < settings['second_repeat'] - 1:
-                                        await asyncio.sleep(float(settings.get('spacing', 1.0)))
-                                except Exception as e:
-                                    st.error(f"2순위 음성 재생 오류: {str(e)}")
-                                    continue
-
-                    # 3순위 음성 재생
-                    if third_lang in VOICE_MAPPING:
-                        voice = get_voice_mapping(third_lang, settings['third_voice'])
-                        if voice:
-                            speed = get_speed_for_language(third_lang, 'third')
-                            for _ in range(settings['third_repeat']):
-                                try:
-                                    voice_file = await get_voice_file(text_data[third_lang][i], voice, speed)
-                                    if voice_file:
-                                        play_audio(voice_file)
-                                    if _ < settings['third_repeat'] - 1:
-                                        await asyncio.sleep(float(settings.get('spacing', 1.0)))
-                                except Exception as e:
-                                    st.error(f"3순위 음성 재생 오류: {str(e)}")
-                                    continue
-
-                except Exception as e:
-                    st.error(f"음성 재생 중 오류 발생: {str(e)}")
-                    continue
+                            speed = get_speed_for_language(lang, voice_key.split('_')[0])
+                            for _ in range(settings[repeat_key]):
+                                voice_file = await get_voice_file(text_data[lang][i], voice, speed)
+                                if voice_file:
+                                    play_audio(voice_file)
+                                if _ < settings[repeat_key] - 1:
+                                    await asyncio.sleep(float(settings.get('spacing', 1.0)))
 
                 # 문장 간 간격
                 await asyncio.sleep(float(settings.get('spacing', 1.0)))
 
     except Exception as e:
         st.error(f"학습 중 오류가 발생했습니다: {str(e)}")
-        traceback.print_exc()
         return
 
 def create_personalized_ui():
