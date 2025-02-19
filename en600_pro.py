@@ -5,7 +5,6 @@ import asyncio
 import os
 import time
 from pathlib import Path
-import pygame
 import wave
 import soundfile as sf
 from PIL import Image
@@ -26,7 +25,7 @@ import librosa
 SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 SETTINGS_PATH = SCRIPT_DIR / 'base/en600s-settings.json'
 EXCEL_PATH = SCRIPT_DIR / 'base/en600new.xlsx'
-TEMP_DIR = SCRIPT_DIR / 'temp'  # 임시 파일 저장 경로 추가
+TEMP_DIR = Path(os.getenv('TMPDIR', '/tmp')) / 'en600st_temp'
 
 # base 폴더가 없으면 생성
 if not (SCRIPT_DIR / 'base').exists():
@@ -239,7 +238,7 @@ def initialize_session_state():
     
     # temp 폴더가 없으면 생성
     if not TEMP_DIR.exists():
-        TEMP_DIR.mkdir(parents=True)
+        TEMP_DIR.mkdir(parents=True, exist_ok=True)
     
     # break.wav 파일 존재 여부 확인
     break_sound_path = SCRIPT_DIR / './base/break.wav'
@@ -1061,10 +1060,7 @@ async def start_learning():
                                 try:
                                     voice_file = await get_voice_file(text_data[first_lang][i], voice, speed)
                                     if voice_file:
-                                        await play_audio_file(voice_file)
-                                        await wait_for_audio_complete(voice_file)
-                                    if _ < settings['first_repeat'] - 1:
-                                        await asyncio.sleep(float(settings.get('spacing', 1.0)))
+                                        await play_audio(voice_file)
                                 except Exception as e:
                                     st.error(f"1순위 음성 재생 오류: {str(e)}")
                                     continue
@@ -1078,10 +1074,7 @@ async def start_learning():
                                 try:
                                     voice_file = await get_voice_file(text_data[second_lang][i], voice, speed)
                                     if voice_file:
-                                        await play_audio_file(voice_file)
-                                        await wait_for_audio_complete(voice_file)
-                                    if _ < settings['second_repeat'] - 1:
-                                        await asyncio.sleep(float(settings.get('spacing', 1.0)))
+                                        await play_audio(voice_file)
                                 except Exception as e:
                                     st.error(f"2순위 음성 재생 오류: {str(e)}")
                                     continue
@@ -1095,10 +1088,7 @@ async def start_learning():
                                 try:
                                     voice_file = await get_voice_file(text_data[third_lang][i], voice, speed)
                                     if voice_file:
-                                        await play_audio_file(voice_file)
-                                        await wait_for_audio_complete(voice_file)
-                                    if _ < settings['third_repeat'] - 1:
-                                        await asyncio.sleep(float(settings.get('spacing', 1.0)))
+                                        await play_audio(voice_file)
                                 except Exception as e:
                                     st.error(f"3순위 음성 재생 오류: {str(e)}")
                                     continue
@@ -1180,9 +1170,9 @@ def get_setting(key, default_value):
     """안전하게 설정값을 가져오는 유틸리티 함수"""
     return st.session_state.settings.get(key, default_value)
 
-def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
+async def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
     """
-    음성 파일 재생 - 문장 간격 및 다음 문장 설정 적용
+    HTML5 audio 태그를 사용하여 음성 파일 재생
     """
     try:
         if not file_path or not os.path.exists(file_path):
@@ -1196,11 +1186,9 @@ def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
                 rate = wav_file.getframerate()
                 duration = frames / float(rate)
         except Exception:
-            with open(file_path, 'rb') as f:
-                audio_bytes = f.read()
-            duration = len(audio_bytes) / 32000
+            duration = 2.0  # 기본 재생 시간
 
-        # 파일을 바이트로 읽기
+        # 파일을 base64로 인코딩
         with open(file_path, 'rb') as f:
             audio_bytes = f.read()
         audio_base64 = base64.b64encode(audio_bytes).decode()
@@ -1208,64 +1196,22 @@ def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
         # 고유한 ID 생성
         audio_id = f"audio_{int(time.time() * 1000)}"
         
-        # HTML 오디오 요소 생성
+        # HTML5 audio 요소 생성 및 자동 재생
         st.markdown(f"""
-            <audio id="{audio_id}" autoplay="true">
+            <audio id="{audio_id}" autoplay="true" onended="this.remove()">
                 <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
             </audio>
             <script>
-                (function() {{
-                    const audio = document.getElementById("{audio_id}");
-                    
-                    // 이전 오디오가 있으면 정지
-                    if (window.currentAudio && window.currentAudio !== audio) {{
-                        window.currentAudio.pause();
-                        window.currentAudio.currentTime = 0;
-                        window.currentAudio.remove();
-                    }}
-                    
-                    // 현재 오디오를 전역 변수에 저장
-                    window.currentAudio = audio;
-                    window.audioEnded = false;
-                    
-                    // 재생 완료 이벤트
-                    audio.onended = function() {{
-                        window.audioEnded = true;
-                        if (window.currentAudio === audio) {{
-                            window.currentAudio = null;
-                        }}
-                        audio.remove();
-                    }};
-
-                    // 재생 시작 이벤트
-                    audio.onplay = function() {{
-                        window.audioEnded = false;
-                    }};
-                }})();
+                const audio = document.getElementById("{audio_id}");
+                audio.play().catch(function(error) {{
+                    console.log("Audio playback failed:", error);
+                }});
             </script>
         """, unsafe_allow_html=True)
 
         # 대기 시간 계산
-        if next_sentence:
-            # 다음 문장으로 빠르게 넘어가기
-            wait_time = duration + 0.3  # 최소 대기 시간
-        else:
-            # 문장 간격 적용
-            base_wait = duration
-            
-            # 긴 문장에 대한 추가 대기 시간
-            if duration > 5:
-                extra_wait = duration * 0.1  # 10% 추가
-            else:
-                extra_wait = 0.5
-                
-            # 사용자가 설정한 문장 간격 적용
-            wait_time = base_wait + extra_wait + sentence_interval
-
-        # 최소 대기 시간 보장
-        wait_time = max(wait_time, duration + 0.3)
-        
-        time.sleep(wait_time)
+        wait_time = duration + sentence_interval if not next_sentence else duration + 0.3
+        await asyncio.sleep(wait_time)
 
     except Exception as e:
         st.error(f"음성 재생 오류: {str(e)}")
@@ -1362,7 +1308,7 @@ def handle_resume_learning(df):
 async def play_audio_file(file_path):
     """음성 파일 재생"""
     try:
-        play_audio(file_path)  # 기존의 play_audio 함수 사용
+        await play_audio(file_path)  # 기존의 play_audio 함수 사용
     except Exception as e:
         st.error(f"음성 재생 오류: {str(e)}")
 
