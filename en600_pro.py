@@ -1052,7 +1052,7 @@ async def start_learning():
                                 try:
                                     voice_file = await get_voice_file(text_data[first_lang][i], voice, speed)
                                     if voice_file:
-                                        await play_audio(voice_file)
+                                        play_audio(voice_file)
                                 except Exception as e:
                                     st.error(f"1순위 음성 재생 오류: {str(e)}")
                                     continue
@@ -1066,7 +1066,7 @@ async def start_learning():
                                 try:
                                     voice_file = await get_voice_file(text_data[second_lang][i], voice, speed)
                                     if voice_file:
-                                        await play_audio(voice_file)
+                                        play_audio(voice_file)
                                 except Exception as e:
                                     st.error(f"2순위 음성 재생 오류: {str(e)}")
                                     continue
@@ -1080,7 +1080,7 @@ async def start_learning():
                                 try:
                                     voice_file = await get_voice_file(text_data[third_lang][i], voice, speed)
                                     if voice_file:
-                                        await play_audio(voice_file)
+                                        play_audio(voice_file)
                                 except Exception as e:
                                     st.error(f"3순위 음성 재생 오류: {str(e)}")
                                     continue
