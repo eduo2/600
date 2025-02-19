@@ -1164,7 +1164,7 @@ def get_setting(key, default_value):
 
 async def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
     """
-    HTML5 audio 태그를 사용하여 음성 파일 재생 (단순화된 버전)
+    음성 파일 재생 - 문장 간격 및 다음 문장 설정 적용
     """
     try:
         if not file_path or not os.path.exists(file_path):
@@ -1175,29 +1175,39 @@ async def play_audio(file_path, sentence_interval=1.0, next_sentence=False):
         with open(file_path, 'rb') as f:
             audio_bytes = f.read()
         audio_base64 = base64.b64encode(audio_bytes).decode()
+        duration = len(audio_bytes) / 32000  # 기본 대기 시간 계산
 
         # 고유한 ID 생성
         audio_id = f"audio_{int(time.time() * 1000)}"
         
-        # HTML5 audio 요소 생성
+        # HTML 오디오 요소 생성
         st.markdown(f"""
-            <audio id="{audio_id}" autoplay>
+            <audio id="{audio_id}" autoplay="true">
                 <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
             </audio>
+            <script>
+                (function() {{
+                    const audio = document.getElementById("{audio_id}");
+                    if (window.currentAudio && window.currentAudio !== audio) {{
+                        window.currentAudio.pause();
+                        window.currentAudio.currentTime = 0;
+                        window.currentAudio.remove();
+                    }}
+                    window.currentAudio = audio;
+                }})();
+            </script>
         """, unsafe_allow_html=True)
 
-        # 기본 대기 시간 사용
-        await asyncio.sleep(2.0 + sentence_interval)
+        # 대기 시간 계산
+        wait_time = duration + (0.3 if next_sentence else sentence_interval)
+        await asyncio.sleep(wait_time)
 
-    except Exception as e:
-        st.error(f"음성 재생 오류: {str(e)}")
     finally:
-        # 임시 파일 삭제
-        try:
-            if file_path and TEMP_DIR in Path(file_path).parents:
+        if file_path and TEMP_DIR in Path(file_path).parents:
+            try:
                 os.remove(file_path)
-        except Exception:
-            pass
+            except Exception:
+                pass
 
 def save_learning_state(df, current_index, session_state):
     """
@@ -1292,15 +1302,12 @@ async def wait_for_audio_complete(file_path=None):
     """음성 재생 완료 대기"""
     try:
         if file_path and os.path.exists(file_path):
-            with wave.open(file_path, 'rb') as wav_file:
-                frames = wav_file.getnframes()
-                rate = wav_file.getframerate()
-                duration = frames / float(rate)
-                await asyncio.sleep(duration)
+            audio_size = os.path.getsize(file_path)
+            duration = audio_size / 32000  # 근사값 계산
+            await asyncio.sleep(duration)
         else:
             await asyncio.sleep(0.5)
     except Exception:
-        # 기본 대기 시간
         await asyncio.sleep(0.5)
 
 def load_excel_data():
