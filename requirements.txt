@@ -7,7 +7,6 @@ numpy<=2.1.0  # Numba compatibility requirement
 
 # Audio Processing
 edge-tts>=6.1.9
-soundfile>=0.12.1
 
 # Image Processing
 Pillow>=10.0.0
