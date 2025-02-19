@@ -1,13 +1,12 @@
 # Web Application
-streamlit>=1.28.0  # 안정적인 버전으로 변경
+streamlit>=1.28.0
 
 # Data Processing
-pandas>=2.0.0  # 더 넓은 호환성
+pandas>=2.0.0
 numpy<=2.1.0  # Numba compatibility requirement
 
 # Audio Processing
 edge-tts>=6.1.9
-pygame>=2.5.0  # 안정적인 버전으로 변경
 soundfile>=0.12.1
 
 # Image Processing
@@ -15,11 +14,6 @@ Pillow>=10.0.0
 
 # Excel Support
 openpyxl>=3.1.0
-
-# Optional Audio Processing (may not work on mobile)
-# librosa>=0.10.1  # Heavy dependency
-# pydub>=0.25.1   # Requires ffmpeg
-# gTTS>=2.5.0     # Uses mp3 format
 
 # Additional Requirements
 python-dotenv>=1.0.0
